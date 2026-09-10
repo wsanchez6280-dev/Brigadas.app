@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro de Pacientes — Brigadas de Salud Visual</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<style>
+  :root{
+    --verde-oscuro:#1F4B3F;
+    --verde-medio:#2E6B57;
+    --verde-claro:#E8F1EC;
+    --hueso:#FBFAF7;
+    --arena:#F1EDE3;
+    --tierra:#B5651D;
+    --texto:#20261F;
+    --texto-suave:#5B6660;
+    --borde:#D7D2C4;
+    --rojo:#A83232;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Georgia','Iowan Old Style',serif;
+    background:var(--hueso);
+    color:var(--texto);
+  }
+  .marca{
+    background:var(--verde-oscuro);
+    color:var(--hueso);
+    padding:22px 20px 20px;
+  }
+  .marca-inner{
+    max-width:920px;
+    margin:0 auto;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .marca h1{
+    font-size:1.5rem;
+    margin:0;
+    font-weight:400;
+    letter-spacing:0.3px;
+  }
+  .marca .contador{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:0.85rem;
+    color:var(--verde-claro);
+    opacity:0.9;
+  }
+  .tabs{
+    max-width:920px;
+    margin:0 auto;
+    display:flex;
+    border-bottom:1px solid var(--borde);
+    background:var(--arena);
+  }
+  .tab{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    padding:14px 20px;
+    cursor:pointer;
+    font-size:0.95rem;
+    color:var(--texto-suave);
+    border-bottom:3px solid transparent;
+    user-select:none;
+  }
+  .tab.activa{
+    color:var(--verde-oscuro);
+    border-bottom-color:var(--tierra);
+    font-weight:600;
+  }
+  main{
+    max-width:920px;
+    margin:0 auto;
+    padding:28px 20px 80px;
+  }
+  .vista{display:none;}
+  .vista.activa{display:block;}
+
+  /* FORMULARIO */
+  .grupo{
+    margin-bottom:18px;
+  }
+  .fila{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .fila > .grupo{
+    flex:1 1 220px;
+  }
+  label{
+    display:block;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:0.82rem;
+    color:var(--texto-suave);
+    margin-bottom:6px;
+  }
+  label .req{color:var(--tierra);}
+  input, select, textarea{
+    width:100%;
+    padding:11px 12px;
+    border:1px solid var(--borde);
+    border-radius:4px;
+    font-size:1rem;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:#fff;
+    color:var(--texto);
+  }
+  input:focus, select:focus, textarea:focus{
+    outline:2px solid var(--verde-medio);
+    outline-offset:1px;
+    border-color:var(--verde-medio);
+  }
+  textarea{resize:vertical;min-height:70px;}
+  .seccion-titulo{
+    font-size:1.05rem;
+    color:var(--verde-oscuro);
+    margin:0 0 16px;
+    padding-bottom:8px;
+    border-bottom:1px solid var(--borde);
+  }
+  .seccion{margin-bottom:30px;}
+
+  button.principal{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:var(--verde-oscuro);
+    color:#fff;
+    border:none;
+    padding:14px 26px;
+    font-size:1rem;
+    border-radius:4px;
+    cursor:pointer;
+    width:100%;
+  }
+  button.principal:active{background:var(--verde-medio);}
+  button.principal:disabled{background:#9AA8A2;cursor:default;}
+
+  .mensaje-ok{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:var(--verde-claro);
+    border:1px solid var(--verde-medio);
+    color:var(--verde-oscuro);
+    padding:14px 16px;
+    border-radius:4px;
+    margin-bottom:20px;
+    display:none;
+  }
+  .mensaje-error{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:#F7E6E3;
+    border:1px solid var(--rojo);
+    color:var(--rojo);
+    padding:12px 16px;
+    border-radius:4px;
+    margin-bottom:20px;
+    display:none;
+    font-size:0.9rem;
+  }
+
+  /* LISTA */
+  .barra-lista{
+    display:flex;
+    gap:10px;
+    margin-bottom:20px;
+    flex-wrap:wrap;
+  }
+  .barra-lista input{flex:1 1 200px;}
+  .btn-secundario{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:#fff;
+    border:1px solid var(--verde-oscuro);
+    color:var(--verde-oscuro);
+    padding:11px 18px;
+    border-radius:4px;
+    cursor:pointer;
+    font-size:0.9rem;
+    white-space:nowrap;
+  }
+  .btn-secundario:hover{background:var(--verde-claro);}
+
+  .tarjeta-paciente{
+    background:#fff;
+    border:1px solid var(--borde);
+    border-left:4px solid var(--verde-medio);
+    border-radius:4px;
+    padding:16px 18px;
+    margin-bottom:12px;
+  }
+  .tarjeta-cabeza{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .tarjeta-nombre{
+    font-size:1.1rem;
+    color:var(--texto);
+  }
+  .tarjeta-hora{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:0.75rem;
+    color:var(--texto-suave);
+  }
+  .tarjeta-datos{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:6px 16px;
+    margin-top:10px;
+    font-size:0.88rem;
+    color:var(--texto-suave);
+  }
+  .tarjeta-datos b{color:var(--texto);font-weight:600;}
+  .grid-check{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 16px;
+  }
+  .check-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:0.92rem;
+  }
+  .check-item input{
+    width:auto;
+    accent-color:var(--verde-oscuro);
+  }
+  .tabla-clinica{
+    width:100%;
+    border-collapse:collapse;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:0.88rem;
+  }
+  .tabla-clinica th, .tabla-clinica td{
+    border:1px solid var(--borde);
+    padding:6px 8px;
+    text-align:left;
+  }
+  .tabla-clinica input{
+    padding:6px 8px;
+    font-size:0.9rem;
+  }
+  .vacio{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    text-align:center;
+    color:var(--texto-suave);
+    padding:50px 20px;
+  }
+
+  /* MODO PACIENTE: solo formulario, sin ver otros datos */
+  body.modo-paciente .tabs{display:none;}
+  body.modo-paciente .contador{display:none;}
+  body.modo-paciente #aviso-personal{display:none;}
+  body.modo-paciente .solo-personal{display:none;}
+  .cargando{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    text-align:center;
+    color:var(--texto-suave);
+    padding:30px;
+  }
+  .aviso-compartido{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:0.78rem;
+    color:var(--texto-suave);
+    background:var(--arena);
+    border:1px solid var(--borde);
+    padding:10px 14px;
+    border-radius:4px;
+    margin-bottom:20px;
+  }
+</style>
+</head>
+<body>
+
+<div id="pantalla-bloqueo" style="display:none;position:fixed;inset:0;background:var(--hueso);z-index:9999;align-items:center;justify-content:center;padding:30px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div style="max-width:420px;">
+    <h2 style="color:var(--verde-oscuro);margin-bottom:14px;">Acceso no disponible</h2>
+    <p id="pantalla-bloqueo-mensaje" style="color:var(--texto-suave);line-height:1.5;">Este enlace no está activo actualmente. Comunícate con el proveedor del servicio para más información.</p>
+  </div>
+</div>
+
+<div class="marca">
+  <div class="marca-inner">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <img src="./logo-hospital.png" alt="Logo Hospital Cristiano de Especialidades" style="height:44px;width:44px;object-fit:contain;flex-shrink:0;">
+      <h1>Registro de pacientes — Brigadas de salud visual</h1>
+    </div>
+    <div class="contador" id="contador">Cargando…</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab activa" data-vista="registro">Nuevo registro</div>
+  <div class="tab" data-vista="lista">Pacientes inscritos</div>
+  <div class="tab" data-vista="admin">Administrador</div>
+</div>
+
+<main>
+
+  <div class="vista activa" id="vista-registro">
+    <div class="aviso-compartido" id="aviso-personal">
+      Estos datos se guardan únicamente en este dispositivo y navegador, sin necesidad de internet. Si varios dispositivos van a registrar pacientes, cada uno tendrá su propia lista: al final del día, exporta el CSV de cada uno y júntalos en una sola hoja de Excel.
+    </div>
+    <div class="aviso-compartido" id="aviso-paciente" style="display:none;">
+      Tus datos serán usados únicamente por el equipo médico de la brigada, para tu atención y seguimiento.
+    </div>
+    <div class="mensaje-ok" id="mensaje-ok">Paciente registrado correctamente.</div>
+    <div class="mensaje-error" id="mensaje-error"></div>
+
+    <form id="form-registro">
+      <div class="seccion">
+        <div class="seccion-titulo">Brigada</div>
+        <div class="grupo">
+          <label>Nombre o lugar de la brigada <span class="req">*</span></label>
+          <input type="text" id="brigada" list="lista-brigadas" placeholder="Ej. Brigada El Tambo, Brigada Vereda La Unión…" required autocomplete="off">
+          <datalist id="lista-brigadas"></datalist>
+        </div>
+      </div>
+
+      <div class="seccion">
+        <div class="seccion-titulo">Datos de identificación</div>
+        <div class="grupo">
+          <label>Nombre completo <span class="req">*</span></label>
+          <input type="text" id="nombre" required autocomplete="off">
+        </div>
+        <div class="grupo">
+          <label>Apellidos (para la Ficha Record, si se manejan por separado)</label>
+          <input type="text" id="apellidos" autocomplete="off">
+        </div>
+        <div class="fila">
+          <div class="grupo">
+            <label>Tipo de documento</label>
+            <select id="tipo_doc">
+              <option value="Cédula">Cédula</option>
+              <option value="Tarjeta de identidad">Tarjeta de identidad</option>
+              <option value="Registro civil">Registro civil</option>
+              <option value="Pasaporte">Pasaporte</option>
+              <option value="Sin documento">Sin documento</option>
+            </select>
+          </div>
+          <div class="grupo">
+            <label>Número de documento</label>
+            <input type="text" id="numero_doc" autocomplete="off">
+          </div>
+        </div>
+        <div class="fila">
+          <div class="grupo">
+            <label>Fecha de nacimiento</label>
+            <input type="date" id="fecha_nacimiento">
+          </div>
+          <div class="grupo">
+            <label>Edad (se calcula sola con la fecha de nacimiento; edítala si no hay fecha)</label>
+            <input type="number" id="edad" min="0" max="120">
+          </div>
+          <div class="grupo">
+            <label>Sexo</label>
+            <select id="sexo">
+              <option value="">Seleccionar</option>
+              <option value="Femenino">Femenino</option>
+              <option value="Masculino">Masculino</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="seccion">
+        <div class="seccion-titulo">Contacto y ubicación</div>
+        <div class="fila">
+          <div class="grupo">
+            <label>Teléfono</label>
+            <input type="tel" id="telefono" autocomplete="off">
+          </div>
+          <div class="grupo">
+            <label>Correo electrónico</label>
+            <input type="email" id="correo" autocomplete="off">
+          </div>
+        </div>
+        <div class="grupo">
+          <label>Comunidad / vereda / barrio</label>
+          <input type="text" id="comunidad" autocomplete="off">
+        </div>
+        <div class="grupo">
+          <label>Acompañante o contacto de emergencia</label>
+          <input type="text" id="acompanante" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="seccion solo-personal">
+        <div class="seccion-titulo">Motivo de consulta</div>
+        <div class="grupo">
+          <label>Motivo o síntoma principal</label>
+          <textarea id="motivo" placeholder="Ej. dificultad para ver de lejos, ojo rojo, dolor de cabeza al leer…"></textarea>
+        </div>
+      </div>
+
+      <div class="seccion solo-personal">
+        <div class="seccion-titulo">Antecedentes patológicos personales</div>
+        <div class="grid-check" id="check-personales"></div>
+      </div>
+
+      <div class="seccion solo-personal">
+        <div class="seccion-titulo">Antecedentes patológicos familiares</div>
+        <div class="grid-check" id="check-familiares"></div>
+      </div>
+
+      <div class="seccion solo-personal">
+        <div class="seccion-titulo">Medicación actual</div>
+        <div class="grupo">
+          <input type="text" id="medicacion_actual" placeholder="Medicamentos que toma actualmente">
+        </div>
+      </div>
+
+      <div class="seccion solo-personal">
+        <div class="seccion-titulo">Agudeza visual</div>
+        <table class="tabla-clinica">
+          <tr><th></th><th>AV OD</th><th>AV OI</th></tr>
+          <tr><td>SC (sin corrección)</td><td><input type="text" id="av_sc_od"></td><td><input type="text" id="av_sc_oi"></td></tr>
+          <tr><td>CC (con corrección)</td><td><input type="text" id="av_cc_od"></td><td><input type="text" id="av_cc_oi"></td></tr>
+          <tr><td>PH (pinhole)</td><td><input type="text" id="av_ph_od"></td><td><input type="text" id="av_ph_oi"></td></tr>
+        </table>
+        <div class="grupo" style="margin-top:12px;">
+          <label>Tomada por</label>
+          <input type="text" id="tomado_por" placeholder="Quién tomó la agudeza visual">
+        </div>
+      </div>
+
+      <div class="seccion solo-personal">
+        <div class="seccion-titulo">Rx subjetiva</div>
+        <table class="tabla-clinica">
+          <tr><th></th><th>Rx Subjetiva</th><th>Avcc</th></tr>
+          <tr><td>OD</td><td><input type="text" id="rx_od"></td><td><input type="text" id="avcc_od"></td></tr>
+          <tr><td>OI</td><td><input type="text" id="rx_oi"></td><td><input type="text" id="avcc_oi"></td></tr>
+          <tr><td>Add</td><td><input type="text" id="rx_add"></td><td><input type="text" id="avcc_add"></td></tr>
+        </table>
+        <div class="grupo" style="margin-top:12px;">
+          <label>Realizada por</label>
+          <input type="text" id="elaborada_por" placeholder="Quién realizó la refracción">
+        </div>
+      </div>
+
+      <div class="seccion solo-personal">
+        <div class="seccion-titulo">Presión intraocular (PIO)</div>
+        <div class="fila">
+          <div class="grupo">
+            <label>OD (mmHg)</label>
+            <input type="text" id="pio_od">
+          </div>
+          <div class="grupo">
+            <label>OI (mmHg)</label>
+            <input type="text" id="pio_oi">
+          </div>
+        </div>
+      </div>
+
+      <div class="seccion solo-personal">
+        <div class="seccion-titulo">Biomicroscopía (BMC)</div>
+        <div class="fila">
+          <div class="grupo">
+            <label>BMC OD</label>
+            <textarea id="bmc_od"></textarea>
+          </div>
+          <div class="grupo">
+            <label>BMC OI</label>
+            <textarea id="bmc_oi"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="seccion solo-personal">
+        <div class="seccion-titulo">Fundoscopia</div>
+        <div class="fila">
+          <div class="grupo">
+            <label>Fundoscopia OD</label>
+            <textarea id="fondo_od"></textarea>
+          </div>
+          <div class="grupo">
+            <label>Fundoscopia OI</label>
+            <textarea id="fondo_oi"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="seccion solo-personal">
+        <div class="seccion-titulo">Diagnóstico y tratamiento</div>
+        <div class="grupo">
+          <label>Diagnóstico</label>
+          <textarea id="diagnostico" placeholder="Ej. defecto refractivo, catarata, pterigión, sin alteración…"></textarea>
+        </div>
+        <div class="grupo">
+          <label>Tratamiento</label>
+          <textarea id="tratamiento"></textarea>
+        </div>
+      </div>
+
+      <div class="seccion solo-personal">
+        <div class="seccion-titulo">Solicito</div>
+        <div class="grid-check" id="check-solicito"></div>
+      </div>
+
+      <div class="seccion solo-personal">
+        <div class="seccion-titulo">Conducta con el paciente</div>
+        <div class="fila">
+          <div class="grupo">
+            <label>Conducta</label>
+            <select id="conducta">
+              <option value="">Seleccionar</option>
+              <option value="Entrega de lentes en brigada">Entrega de lentes en brigada</option>
+              <option value="Remisión a especialista">Remisión a especialista</option>
+              <option value="Control en próxima brigada">Control en próxima brigada</option>
+              <option value="Sin alteración / alta">Sin alteración / alta</option>
+            </select>
+          </div>
+          <div class="grupo">
+            <label>Remitido a (si aplica)</label>
+            <input type="text" id="remitido_a" placeholder="Ej. oftalmología hospital municipal">
+          </div>
+        </div>
+      </div>
+
+      <div class="seccion">
+        <div class="seccion-titulo">Observaciones</div>
+        <div class="grupo">
+          <label>¿Algo más que quieras contarnos?</label>
+          <textarea id="observaciones"></textarea>
+        </div>
+      </div>
+
+      <button type="submit" class="principal" id="btn-guardar">Registrar paciente</button>
+      <button type="button" class="btn-secundario" id="btn-cancelar-edicion" style="display:none;width:100%;margin-top:10px;">Cancelar edición</button>
+    </form>
+  </div>
+
+  <div class="vista" id="vista-lista">
+    <div class="aviso-compartido" style="margin-bottom:16px;">
+      Recuerda exportar el CSV con frecuencia (por ejemplo, al final de cada jornada) y guardarlo en un lugar seguro. Si se borra el historial o los datos del navegador de este dispositivo, se pierden los registros que no hayas exportado.
+    </div>
+    <div class="barra-lista">
+      <select id="filtro-brigada">
+        <option value="">Todas las brigadas</option>
+      </select>
+      <input type="text" id="buscador" placeholder="Buscar por nombre, documento o comunidad…">
+      <button class="btn-secundario" id="btn-exportar">Exportar a CSV</button>
+      <button class="btn-secundario" id="btn-actualizar">Actualizar</button>
+      <button class="btn-secundario" id="btn-borrar-local" style="border-color:var(--rojo);color:var(--rojo);">Borrar todo (solo este dispositivo)</button>
+    </div>
+    <div id="contenedor-lista">
+      <div class="cargando">Cargando pacientes…</div>
+    </div>
+  </div>
+
+  <div class="vista" id="vista-admin">
+    <div id="admin-login">
+      <div class="aviso-compartido">
+        Acceso restringido. Inicia sesión con tu cuenta de administrador para ver los datos de todas las brigadas, corregir o eliminar registros, y administrar la lista de brigadas permitidas.
+      </div>
+      <div class="grupo">
+        <label>Correo</label>
+        <input type="email" id="admin_email" autocomplete="off">
+      </div>
+      <div class="grupo">
+        <label>Contraseña</label>
+        <input type="password" id="admin_password" autocomplete="off">
+      </div>
+      <div class="mensaje-error" id="admin-error"></div>
+      <button class="btn-secundario" id="btn-admin-entrar">Ingresar</button>
+    </div>
+
+    <div id="admin-panel" style="display:none;">
+      <div class="barra-lista">
+        <button class="btn-secundario" id="btn-admin-actualizar">Actualizar datos</button>
+        <button class="btn-secundario" id="btn-admin-salir">Cerrar sesión de administrador</button>
+      </div>
+
+      <div class="seccion-titulo">Resumen por brigada</div>
+      <div id="admin-resumen" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:24px;"></div>
+
+      <div class="seccion-titulo">Brigadas permitidas</div>
+      <div class="grupo">
+        <label>Lista de brigadas (separadas por coma). Si la dejas vacía, cualquiera podrá escribir el nombre libremente.</label>
+        <textarea id="admin_brigadas_lista" placeholder="Brigada El Tambo, Brigada Vereda La Unión, Brigada Centro"></textarea>
+      </div>
+      <button class="btn-secundario" id="btn-admin-guardar-brigadas" style="margin-bottom:24px;">Guardar lista de brigadas</button>
+
+      <div class="seccion-titulo">Todos los pacientes registrados</div>
+      <div class="barra-lista" style="margin-bottom:16px;">
+        <select id="admin_filtro_brigada">
+          <option value="">Todas las brigadas</option>
+        </select>
+        <select id="admin_filtro_estado">
+          <option value="">Todos los estados</option>
+          <option value="incompletos">Incompletos (sin diagnóstico o conducta)</option>
+          <option value="remisiones">Remitidos a especialista</option>
+          <option value="duplicados">Posibles duplicados</option>
+        </select>
+        <input type="text" id="admin_buscador" placeholder="Buscar por nombre, apellido, documento o brigada…">
+        <button class="btn-secundario" id="btn-admin-exportar">Exportar CSV</button>
+      </div>
+      <div id="admin-lista"><div class="cargando">Cargando…</div></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCp0d-8QIhoqgjG5JbtFGsFF68TglRvNFc",
+    authDomain: "brigadas-salud-visual.firebaseapp.com",
+    projectId: "brigadas-salud-visual",
+    storageBucket: "brigadas-salud-visual.firebasestorage.app",
+    messagingSenderId: "89644852281",
+    appId: "1:89644852281:web:f9e95b0f53a150d2bd99e8"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const auth = firebase.auth();
+  try{
+    db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+  }catch(e){}
+
+  // --- Soporte multi-cliente (varios hospitales/brigadas comparten la misma base) ---
+  const ORG_ID = new URLSearchParams(window.location.search).get('org') || '';
+
+  function refOrg(){
+    if(!ORG_ID) throw new Error('Falta el identificador de organización (?org=...) en el link.');
+    return db.collection('organizaciones').doc(ORG_ID);
+  }
+  function refPacientes(){
+    return refOrg().collection('pacientes');
+  }
+  function refConfigBrigadas(){
+    return refOrg().collection('config').doc('brigadas');
+  }
+</script>
+
+<script>
+(function(){
+  let pacientes = [];
+  let idEnEdicion = null;
+  let origenEdicion = 'admin';
+
+  const OPCIONES_ANTECEDENTES = ['HTA','DM','ACV','Infarto','Asma','Glaucoma','Catarata','Migraña','Tabaquismo','Cirugías','Cx Oculares','Alergias'];
+  const OPCIONES_SOLICITO = ['RX','ECOG','V.Clínica','OCT NO','OCT MAC','CV','Topografía','IC Retina','IC Oculo','IC Oftalmped','IC Cornea','IC Glaucoma'];
+
+  function generarCasillas(contenedorId, prefijo, opciones){
+    const contenedor = document.getElementById(contenedorId);
+    contenedor.innerHTML = opciones.map((op, i) => `
+      <label class="check-item">
+        <input type="checkbox" data-grupo="${prefijo}" value="${escaparAtributo(op)}" id="${prefijo}_${i}">
+        ${escaparAtributo(op)}
+      </label>`).join('');
+  }
+
+  function escaparAtributo(texto){
+    return String(texto).replace(/"/g,'&quot;');
+  }
+
+  function leerCasillasMarcadas(prefijo){
+    return Array.from(document.querySelectorAll(`input[data-grupo="${prefijo}"]:checked`)).map(el => el.value);
+  }
+
+  function marcarCasillas(prefijo, valores){
+    const lista = (valores || '').split(',').map(v => v.trim()).filter(Boolean);
+    document.querySelectorAll(`input[data-grupo="${prefijo}"]`).forEach(el => {
+      el.checked = lista.includes(el.value);
+    });
+  }
+
+  generarCasillas('check-personales', 'personales', OPCIONES_ANTECEDENTES);
+  generarCasillas('check-familiares', 'familiares', OPCIONES_ANTECEDENTES);
+  generarCasillas('check-solicito', 'solicito', OPCIONES_SOLICITO);
+
+  const parametrosPagina = new URLSearchParams(window.location.search);
+  const modoPaciente = parametrosPagina.get('modo') === 'paciente';
+
+  if(modoPaciente){
+    document.body.classList.add('modo-paciente');
+    document.getElementById('aviso-paciente').style.display = 'block';
+    document.getElementById('btn-guardar').textContent = 'Enviar mi inscripción';
+    document.getElementById('mensaje-ok').textContent = 'Tu inscripción fue registrada correctamente. Gracias.';
+    const brigadaPrellenada = parametrosPagina.get('brigada');
+    if(brigadaPrellenada){
+      const campoBrigada = document.getElementById('brigada');
+      campoBrigada.value = brigadaPrellenada;
+      campoBrigada.readOnly = true;
+      campoBrigada.style.background = '#F1EDE3';
+    }
+  }
+
+  const tabs = document.querySelectorAll('.tab');
+  const vistas = {
+    registro: document.getElementById('vista-registro'),
+    lista: document.getElementById('vista-lista'),
+    admin: document.getElementById('vista-admin')
+  };
+  function cambiarVista(nombre){
+    tabs.forEach(x => x.classList.toggle('activa', x.dataset.vista === nombre));
+    Object.entries(vistas).forEach(([clave, el]) => el.classList.toggle('activa', clave === nombre));
+    if(nombre === 'lista') cargarPacientes();
+  }
+  tabs.forEach(t => {
+    t.addEventListener('click', () => cambiarVista(t.dataset.vista));
+  });
+
+  function actualizarContador(n){
+    document.getElementById('contador').textContent =
+      n === 1 ? '1 paciente registrado' : n + ' pacientes registrados';
+  }
+
+  const CLAVE_DATOS = 'brigada_pacientes_v1';
+
+  function leerPacientesGuardados(){
+    try{
+      const crudo = localStorage.getItem(CLAVE_DATOS);
+      return crudo ? JSON.parse(crudo) : [];
+    }catch(e){
+      console.error('Error leyendo datos locales', e);
+      return [];
+    }
+  }
+
+  function guardarPacientesEnDisco(lista){
+    localStorage.setItem(CLAVE_DATOS, JSON.stringify(lista));
+  }
+
+  async function cargarPacientes(){
+    const contenedor = document.getElementById('contenedor-lista');
+    try{
+      pacientes = leerPacientesGuardados().sort((a,b) => (b.creado||0) - (a.creado||0));
+      if(pacientes.length === 0){
+        actualizarContador(0);
+        contenedor.innerHTML = '<div class="vacio">Todavía no hay pacientes registrados en este dispositivo. Usa la pestaña "Nuevo registro" para inscribir al primero.</div>';
+        return;
+      }
+      actualizarContador(pacientes.length);
+      poblarBrigadas(pacientes);
+      aplicarFiltros();
+    }catch(e){
+      contenedor.innerHTML = '<div class="vacio">No se pudo cargar la lista guardada en este dispositivo.</div>';
+      console.error(e);
+    }
+  }
+
+  function escapar(texto){
+    const d = document.createElement('div');
+    d.textContent = texto || '';
+    return d.innerHTML;
+  }
+
+  function dibujarLista(lista){
+    const contenedor = document.getElementById('contenedor-lista');
+    if(lista.length === 0){
+      contenedor.innerHTML = '<div class="vacio">No se encontraron pacientes con ese criterio.</div>';
+      return;
+    }
+    contenedor.innerHTML = lista.map(p => {
+      const hora = p.creado ? new Date(p.creado).toLocaleString('es-CO', {dateStyle:'medium', timeStyle:'short'}) : '';
+      return `
+        <div class="tarjeta-paciente">
+          <div class="tarjeta-cabeza">
+            <div class="tarjeta-nombre">${escapar(p.nombre) || 'Sin nombre'}</div>
+            <div class="tarjeta-hora">${hora} · <span style="color:var(--verde-medio);">✓ Guardado en la base de datos</span></div>
+          </div>
+          <div class="tarjeta-datos">
+            <div><b>Brigada:</b> ${escapar(p.brigada) || '—'}</div>
+            <div><b>Documento:</b> ${escapar(p.tipo_doc)} ${escapar(p.numero_doc)}</div>
+            <div><b>Edad/Nac.:</b> ${escapar(p.fecha_nacimiento) || escapar(p.edad) || '—'}</div>
+            <div><b>Sexo:</b> ${escapar(p.sexo) || '—'}</div>
+            <div><b>Teléfono:</b> ${escapar(p.telefono) || '—'}</div>
+            <div><b>Correo:</b> ${escapar(p.correo) || '—'}</div>
+            <div><b>Comunidad:</b> ${escapar(p.comunidad) || '—'}</div>
+            <div><b>Motivo:</b> ${escapar(p.motivo) || '—'}</div>
+            <div><b>Diagnóstico:</b> ${escapar(p.diagnostico) || '—'}</div>
+            <div><b>Conducta:</b> ${escapar(p.conducta) || '—'}${p.remitido_a ? ' — ' + escapar(p.remitido_a) : ''}</div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:12px;">
+            <button type="button" class="btn-secundario" onclick="editarPacienteLocal(${p.creado})">Editar / completar</button>
+            <button type="button" class="btn-secundario" onclick="generarFichaPDF(${p.creado})">Generar PDF</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function calcularEdad(fechaStr){
+    if(!fechaStr) return null;
+    const nacimiento = new Date(fechaStr + 'T00:00:00');
+    if(isNaN(nacimiento.getTime())) return null;
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - nacimiento.getFullYear();
+    const aunNoCumple = (hoy.getMonth() < nacimiento.getMonth()) ||
+      (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate());
+    if(aunNoCumple) edad--;
+    return edad >= 0 ? edad : null;
+  }
+
+  document.getElementById('fecha_nacimiento').addEventListener('change', (e) => {
+    const edadCalculada = calcularEdad(e.target.value);
+    if(edadCalculada !== null){
+      document.getElementById('edad').value = edadCalculada;
+    }
+  });
+
+  function generarId(){
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
+  }
+
+  window.generarFichaPDF = function(creado){
+    const paciente = pacientes.find(p => p.creado === creado);
+    if(!paciente){ alert('No se encontró el paciente.'); return; }
+    if(!window.jspdf){ alert('No se pudo cargar el generador de PDF. Verifica tu conexión e intenta de nuevo.'); return; }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+    const M = 40;
+    let y = 50;
+    const anchoUtil = 612 - M * 2;
+
+    function titulo(texto){
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.text(texto, 306, y, { align: 'center' });
+      y += 20;
+    }
+    function linea(){
+      doc.setDrawColor(180);
+      doc.line(M, y, 612 - M, y);
+      y += 14;
+    }
+    function campo(etiqueta, valor, x, anchoCampo){
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text(etiqueta, x, y);
+      const xValor = x + doc.getTextWidth(etiqueta) + 4;
+      doc.setFont('helvetica', 'normal');
+      if(valor){
+        doc.text(String(valor), xValor, y, { maxWidth: anchoCampo });
+      }else{
+        doc.setDrawColor(150);
+        doc.line(xValor, y + 1, x + anchoCampo, y + 1);
+      }
+    }
+    function seccion(texto){
+      y += 6;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text(texto, M, y);
+      y += 14;
+    }
+    function checkboxFila(opciones, seleccionadas, columnas){
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      const anchoCol = anchoUtil / columnas;
+      opciones.forEach((op, i) => {
+        const col = i % columnas;
+        const fila = Math.floor(i / columnas);
+        const x = M + col * anchoCol;
+        const yy = y + fila * 14;
+        doc.rect(x, yy - 8, 8, 8);
+        if(seleccionadas.includes(op)){
+          doc.setFont('helvetica', 'bold');
+          doc.text('X', x + 1.5, yy - 1);
+          doc.setFont('helvetica', 'normal');
+        }
+        doc.text(op, x + 12, yy);
+      });
+      y += Math.ceil(opciones.length / columnas) * 14 + 6;
+    }
+    function textoLargo(etiqueta, valor){
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text(etiqueta, M, y);
+      y += 12;
+      doc.setFont('helvetica', 'normal');
+      if(valor){
+        const lineas = doc.splitTextToSize(String(valor), anchoUtil);
+        doc.text(lineas, M, y);
+        y += lineas.length * 12 + 6;
+      }else{
+        doc.setDrawColor(150);
+        doc.line(M, y + 2, 612 - M, y + 2);
+        y += 14;
+        doc.line(M, y + 2, 612 - M, y + 2);
+        y += 12;
+      }
+    }
+    function celdaTabla(texto, x, esEncabezado){
+      if(esEncabezado){
+        doc.setFont('helvetica','bold');
+        doc.text(String(texto || ''), x, y);
+      }else if(texto){
+        doc.setFont('helvetica','normal');
+        doc.text(String(texto), x, y);
+      }else{
+        doc.setDrawColor(150);
+        doc.line(x, y + 1, x + 55, y + 1);
+      }
+    }
+
+    titulo('FICHA RECORD');
+    y += 4;
+
+    const antecedentesP = (paciente.antecedentes_personales || '').split(',').map(s => s.trim()).filter(Boolean);
+    const antecedentesF = (paciente.antecedentes_familiares || '').split(',').map(s => s.trim()).filter(Boolean);
+    const solicitados = (paciente.solicito || '').split(',').map(s => s.trim()).filter(Boolean);
+    const fechaTexto = paciente.creado ? new Date(paciente.creado).toLocaleDateString('es-CO') : '';
+
+    campo('Nombres:', paciente.nombre, M, 230);
+    campo('Apellidos:', paciente.apellidos, 320, 230);
+    y += 16;
+    campo('CI:', paciente.numero_doc, M, 130);
+    campo('Telf:', paciente.telefono, 220, 130);
+    campo('Fecha:', fechaTexto, 400, 150);
+    y += 16;
+    campo('Procedencia:', paciente.comunidad, M, 230);
+    campo('F.N:', paciente.fecha_nacimiento, 320, 100);
+    campo('Edad:', paciente.edad, 460, 80);
+    y += 16;
+    textoLargo('Motivo de consulta:', paciente.motivo);
+
+    seccion('Antecedentes Patológicos Personales');
+    checkboxFila(OPCIONES_ANTECEDENTES, antecedentesP, 4);
+
+    seccion('Antecedentes Patológicos Familiares');
+    checkboxFila(OPCIONES_ANTECEDENTES, antecedentesF, 4);
+
+    textoLargo('Medicación actual:', paciente.medicacion_actual);
+
+    seccion('Agudeza visual y Rx subjetiva');
+
+    function tablaConRecuadro(x, anchoCols, filas, alturaFila){
+      const anchoTotal = anchoCols.reduce((a,b) => a+b, 0);
+      const altoTotal = filas.length * alturaFila;
+      doc.setDrawColor(120);
+      doc.rect(x, y, anchoTotal, altoTotal);
+      let acumX = x;
+      for(let c = 1; c < anchoCols.length; c++){
+        acumX += anchoCols[c-1];
+        doc.line(acumX, y, acumX, y + altoTotal);
+      }
+      for(let f = 1; f < filas.length; f++){
+        doc.line(x, y + f*alturaFila, x + anchoTotal, y + f*alturaFila);
+      }
+      filas.forEach((fila, f) => {
+        let cx = x;
+        doc.setFont('helvetica', f === 0 ? 'bold' : 'normal');
+        doc.setFontSize(9);
+        fila.forEach((texto, c) => {
+          if(texto) doc.text(String(texto), cx + 4, y + f*alturaFila + alturaFila/2 + 3);
+          cx += anchoCols[c];
+        });
+      });
+      return altoTotal;
+    }
+
+    const anchoFilaAlto = 16;
+    const altoTablaAV = tablaConRecuadro(M, [55,95,95], [
+      ['', 'AV OD', 'AV OI'],
+      ['SC', paciente.av_sc_od, paciente.av_sc_oi],
+      ['CC', paciente.av_cc_od, paciente.av_cc_oi],
+      ['PH', paciente.av_ph_od, paciente.av_ph_oi]
+    ], anchoFilaAlto);
+
+    tablaConRecuadro(M + 260, [45,140,90], [
+      ['', 'Rx Subjetiva', 'Avcc'],
+      ['OD', paciente.rx_od, paciente.avcc_od],
+      ['OI', paciente.rx_oi, paciente.avcc_oi],
+      ['Add', paciente.rx_add, paciente.avcc_add]
+    ], anchoFilaAlto);
+
+    y += altoTablaAV + 4;
+    campo('Tomada por:', paciente.tomado_por, M, 200);
+    campo('Realizada por:', paciente.elaborada_por, M + 260, 200);
+    y += 18;
+
+    campo('PIO OD:', paciente.pio_od ? paciente.pio_od + ' mmHg' : '', M, 200);
+    campo('PIO OI:', paciente.pio_oi ? paciente.pio_oi + ' mmHg' : '', 320, 200);
+    y += 16;
+
+    seccion('Biomicroscopía');
+    textoLargo('BMC OD:', paciente.bmc_od);
+    textoLargo('BMC OI:', paciente.bmc_oi);
+
+    seccion('Fundoscopia');
+    const radioCirculo = 62;
+    const centroYCirculo = y + radioCirculo;
+    const centroX1 = M + 100;
+    const centroX2 = M + 100 + radioCirculo*2 + 80;
+    doc.setDrawColor(120);
+    doc.ellipse(centroX1, centroYCirculo, radioCirculo, radioCirculo, 'S');
+    doc.ellipse(centroX2, centroYCirculo, radioCirculo, radioCirculo, 'S');
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9);
+    doc.text('OD', centroX1, centroYCirculo - radioCirculo - 6, { align: 'center' });
+    doc.text('OI', centroX2, centroYCirculo - radioCirculo - 6, { align: 'center' });
+    y = centroYCirculo + radioCirculo + 14;
+    if(paciente.fondo_od || paciente.fondo_oi){
+      textoLargo('Notas fundoscopia OD:', paciente.fondo_od);
+      textoLargo('Notas fundoscopia OI:', paciente.fondo_oi);
+    }
+
+    seccion('Diagnóstico y tratamiento');
+    textoLargo('Diagnóstico:', paciente.diagnostico);
+    textoLargo('Tratamiento:', paciente.tratamiento);
+
+    seccion('Solicito');
+    checkboxFila(OPCIONES_SOLICITO, solicitados, 3);
+
+    campo('Conducta:', paciente.conducta, M, 500);
+    y += 16;
+    if(paciente.remitido_a){ campo('Remitido a:', paciente.remitido_a, M, 500); y += 16; }
+    if(paciente.observaciones){ textoLargo('Observaciones:', paciente.observaciones); }
+
+    const nombreArchivo = 'ficha_' + (paciente.nombre || 'paciente').replace(/[^a-zA-Z0-9]+/g, '_') + '.pdf';
+    doc.save(nombreArchivo);
+  };
+
+  function poblarBrigadas(lista){
+    const nombres = [...new Set(lista.map(p => p.brigada).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'es'));
+
+    const datalist = document.getElementById('lista-brigadas');
+    datalist.innerHTML = nombres.map(n => `<option value="${escapar(n)}">`).join('');
+
+    const filtro = document.getElementById('filtro-brigada');
+    const valorActual = filtro.value;
+    filtro.innerHTML = '<option value="">Todas las brigadas</option>' +
+      nombres.map(n => `<option value="${escapar(n)}">${escapar(n)}</option>`).join('');
+    if(nombres.includes(valorActual)) filtro.value = valorActual;
+  }
+
+  function aplicarFiltros(){
+    const q = document.getElementById('buscador').value.trim().toLowerCase();
+    const brigadaSeleccionada = document.getElementById('filtro-brigada').value;
+    let filtrados = pacientes;
+    if(brigadaSeleccionada){
+      filtrados = filtrados.filter(p => p.brigada === brigadaSeleccionada);
+    }
+    if(q){
+      filtrados = filtrados.filter(p =>
+        (p.nombre||'').toLowerCase().includes(q) ||
+        (p.numero_doc||'').toLowerCase().includes(q) ||
+        (p.comunidad||'').toLowerCase().includes(q)
+      );
+    }
+    dibujarLista(filtrados);
+    return filtrados;
+  }
+
+  document.getElementById('buscador').addEventListener('input', aplicarFiltros);
+  document.getElementById('filtro-brigada').addEventListener('change', aplicarFiltros);
+
+  document.getElementById('btn-actualizar').addEventListener('click', cargarPacientes);
+
+  document.getElementById('btn-borrar-local').addEventListener('click', () => {
+    if(!confirm('¿Borrar todos los pacientes guardados en ESTE dispositivo? Esto no afecta lo que ya está guardado en la base de datos (Firestore), solo la copia local de este celular/computador.')) return;
+    localStorage.removeItem(CLAVE_DATOS);
+    cargarPacientes();
+    alert('Listo, la lista local de este dispositivo quedó en cero.');
+  });
+
+  document.getElementById('btn-exportar').addEventListener('click', () => {
+    const aExportar = aplicarFiltros();
+    if(aExportar.length === 0){ alert('No hay pacientes para exportar con el filtro actual.'); return; }
+    const columnas = ['brigada','nombre','apellidos','tipo_doc','numero_doc','fecha_nacimiento','edad','sexo','telefono','correo','comunidad','acompanante','motivo','antecedentes_personales','antecedentes_familiares','medicacion_actual','av_sc_od','av_sc_oi','av_cc_od','av_cc_oi','av_ph_od','av_ph_oi','rx_od','rx_oi','rx_add','avcc_od','avcc_oi','avcc_add','pio_od','pio_oi','bmc_od','bmc_oi','fondo_od','fondo_oi','diagnostico','tratamiento','solicito','conducta','remitido_a','tomado_por','elaborada_por','observaciones','creado'];
+    const encabezado = ['Brigada','Nombres','Apellidos','Tipo Doc','CI/Documento','Fecha Nac','Edad','Sexo','Telefono','Correo','Procedencia','Acompanante','Motivo','Antecedentes Personales','Antecedentes Familiares','Medicacion Actual','AV SC OD','AV SC OI','AV CC OD','AV CC OI','AV PH OD','AV PH OI','Rx OD','Rx OI','Rx Add','Avcc OD','Avcc OI','Avcc Add','PIO OD','PIO OI','BMC OD','BMC OI','Fundoscopia OD','Fundoscopia OI','Diagnostico','Tratamiento','Solicito','Conducta','Remitido A','Tomado Por','Elaborada Por','Observaciones','Fecha Registro'];
+    const filas = aExportar.map(p => columnas.map(c => {
+      let v = p[c] ?? '';
+      if(c === 'creado' && v) v = new Date(v).toLocaleString('es-CO');
+      v = String(v).replace(/"/g,'""');
+      return `"${v}"`;
+    }).join(','));
+    const csv = [encabezado.join(','), ...filas].join('\n');
+    const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pacientes_brigada.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('form-registro').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const brigada = document.getElementById('brigada').value.trim();
+    const nombre = document.getElementById('nombre').value.trim();
+    const mensajeError = document.getElementById('mensaje-error');
+    const mensajeOk = document.getElementById('mensaje-ok');
+    mensajeError.style.display = 'none';
+    mensajeOk.style.display = 'none';
+
+    if(!brigada){
+      mensajeError.textContent = 'El nombre o lugar de la brigada es obligatorio.';
+      mensajeError.style.display = 'block';
+      return;
+    }
+    if(!nombre){
+      mensajeError.textContent = 'El nombre completo es obligatorio.';
+      mensajeError.style.display = 'block';
+      return;
+    }
+    if(brigadasPermitidas.length && !brigadasPermitidas.some(b => b.toLowerCase() === brigada.toLowerCase())){
+      mensajeError.textContent = 'Esa brigada no está en la lista permitida. Elige una de las sugeridas al escribir.';
+      mensajeError.style.display = 'block';
+      return;
+    }
+
+    const boton = document.getElementById('btn-guardar');
+    boton.disabled = true;
+    boton.textContent = 'Guardando…';
+
+    const paciente = {
+      organizacionId: ORG_ID,
+      id: idEnEdicion || generarId(),
+      brigada,
+      nombre,
+      apellidos: document.getElementById('apellidos').value.trim(),
+      tipo_doc: document.getElementById('tipo_doc').value,
+      numero_doc: document.getElementById('numero_doc').value.trim(),
+      fecha_nacimiento: document.getElementById('fecha_nacimiento').value,
+      edad: document.getElementById('edad').value,
+      sexo: document.getElementById('sexo').value,
+      telefono: document.getElementById('telefono').value.trim(),
+      correo: document.getElementById('correo').value.trim(),
+      comunidad: document.getElementById('comunidad').value.trim(),
+      acompanante: document.getElementById('acompanante').value.trim(),
+      motivo: document.getElementById('motivo').value.trim(),
+      antecedentes_personales: leerCasillasMarcadas('personales').join(', '),
+      antecedentes_familiares: leerCasillasMarcadas('familiares').join(', '),
+      medicacion_actual: document.getElementById('medicacion_actual').value.trim(),
+      av_sc_od: document.getElementById('av_sc_od').value.trim(),
+      av_sc_oi: document.getElementById('av_sc_oi').value.trim(),
+      av_cc_od: document.getElementById('av_cc_od').value.trim(),
+      av_cc_oi: document.getElementById('av_cc_oi').value.trim(),
+      av_ph_od: document.getElementById('av_ph_od').value.trim(),
+      av_ph_oi: document.getElementById('av_ph_oi').value.trim(),
+      rx_od: document.getElementById('rx_od').value.trim(),
+      rx_oi: document.getElementById('rx_oi').value.trim(),
+      rx_add: document.getElementById('rx_add').value.trim(),
+      avcc_od: document.getElementById('avcc_od').value.trim(),
+      avcc_oi: document.getElementById('avcc_oi').value.trim(),
+      avcc_add: document.getElementById('avcc_add').value.trim(),
+      pio_od: document.getElementById('pio_od').value.trim(),
+      pio_oi: document.getElementById('pio_oi').value.trim(),
+      bmc_od: document.getElementById('bmc_od').value.trim(),
+      bmc_oi: document.getElementById('bmc_oi').value.trim(),
+      fondo_od: document.getElementById('fondo_od').value.trim(),
+      fondo_oi: document.getElementById('fondo_oi').value.trim(),
+      diagnostico: document.getElementById('diagnostico').value.trim(),
+      tratamiento: document.getElementById('tratamiento').value.trim(),
+      solicito: leerCasillasMarcadas('solicito').join(', '),
+      conducta: document.getElementById('conducta').value,
+      remitido_a: document.getElementById('remitido_a').value.trim(),
+      tomado_por: document.getElementById('tomado_por').value.trim(),
+      elaborada_por: document.getElementById('elaborada_por').value.trim(),
+      observaciones: document.getElementById('observaciones').value.trim(),
+      creado: Date.now()
+    };
+
+    if(idEnEdicion){
+      try{
+        const datosActualizar = Object.assign({}, paciente);
+        delete datosActualizar.creado; // conservar la fecha de creación original
+        await refPacientes().doc(idEnEdicion).update(datosActualizar);
+
+        // Si el paciente también existe en la copia local de este dispositivo, actualizarla
+        const listaLocal = leerPacientesGuardados();
+        const indiceLocal = listaLocal.findIndex(p => String(p.id) === String(idEnEdicion));
+        if(indiceLocal !== -1){
+          listaLocal[indiceLocal] = Object.assign({}, listaLocal[indiceLocal], datosActualizar);
+          guardarPacientesEnDisco(listaLocal);
+        }
+
+        mensajeOk.textContent = 'Cambios guardados correctamente.';
+        mensajeOk.style.display = 'block';
+        idEnEdicion = null;
+        e.target.reset();
+        document.getElementById('btn-guardar').textContent = modoPaciente ? 'Enviar mi inscripción' : 'Registrar paciente';
+        document.getElementById('btn-cancelar-edicion').style.display = 'none';
+        cambiarVista(origenEdicion);
+        if(origenEdicion === 'admin') cargarPanelAdmin(); else cargarPacientes();
+      }catch(err){
+        mensajeError.textContent = 'No se pudieron guardar los cambios. Verifica tu conexión.';
+        mensajeError.style.display = 'block';
+        console.error(err);
+      }finally{
+        boton.disabled = false;
+        boton.textContent = idEnEdicion ? 'Guardar cambios' : (modoPaciente ? 'Enviar mi inscripción' : 'Registrar paciente');
+      }
+      return;
+    }
+
+    try{
+      // Firestore guarda esto localmente y lo sincroniza solo cuando haya internet,
+      // incluso si en este momento el dispositivo está sin conexión.
+      refPacientes().doc(paciente.id).set(paciente).catch(err => console.error('Error de sincronización (se reintentará solo):', err));
+
+      const listaActual = leerPacientesGuardados();
+      listaActual.push(paciente);
+      guardarPacientesEnDisco(listaActual);
+      mensajeOk.style.display = 'block';
+      e.target.reset();
+      window.scrollTo({top:0, behavior:'smooth'});
+      cargarPacientes();
+    }catch(err){
+      mensajeError.textContent = 'No se pudo guardar el registro en este dispositivo. Puede que la memoria del navegador esté llena.';
+      mensajeError.style.display = 'block';
+      console.error(err);
+    }finally{
+      boton.disabled = false;
+      boton.textContent = modoPaciente ? 'Enviar mi inscripción' : 'Registrar paciente';
+    }
+  });
+
+  let adminPacientesCache = [];
+  let brigadasPermitidas = [];
+
+  // Cargar lista de brigadas permitidas (público, cualquiera puede leerla)
+  (async function cargarBrigadasPermitidas(){
+    try{
+      const doc = await refConfigBrigadas().get();
+      if(doc.exists && Array.isArray(doc.data().lista)){
+        brigadasPermitidas = doc.data().lista;
+        if(brigadasPermitidas.length){
+          convertirBrigadaEnLista(brigadasPermitidas);
+        }
+      }
+    }catch(err){ /* sin conexión: se ignora, no bloquea el registro */ }
+  })();
+
+  function convertirBrigadaEnLista(nombres){
+    const campoActual = document.getElementById('brigada');
+    if(!campoActual || campoActual.tagName === 'SELECT') return;
+    const valorPrevio = campoActual.value;
+    const eraSoloLectura = campoActual.readOnly;
+
+    const select = document.createElement('select');
+    select.id = 'brigada';
+    select.required = true;
+
+    const opcionVacia = document.createElement('option');
+    opcionVacia.value = '';
+    opcionVacia.textContent = 'Selecciona tu brigada…';
+    select.appendChild(opcionVacia);
+
+    nombres.forEach(nombre => {
+      const opcion = document.createElement('option');
+      opcion.value = nombre;
+      opcion.textContent = nombre;
+      select.appendChild(opcion);
+    });
+
+    if(valorPrevio && nombres.some(n => n.toLowerCase() === valorPrevio.toLowerCase())){
+      select.value = nombres.find(n => n.toLowerCase() === valorPrevio.toLowerCase());
+    }
+    if(eraSoloLectura) select.disabled = true;
+
+    campoActual.replaceWith(select);
+  }
+
+  async function validarPertenenciaOrg(user){
+    try{
+      const doc = await db.collection('usuarios').doc(user.uid).get();
+      if(!doc.exists) return { ok:false, motivo:'Tu usuario no está registrado en ninguna organización.' };
+      const datos = doc.data();
+      if(datos.organizacionId !== ORG_ID){
+        return { ok:false, motivo:'Tu usuario no pertenece a esta organización.' };
+      }
+      return { ok:true };
+    }catch(err){
+      return { ok:false, motivo:'No se pudo verificar tu acceso. Revisa tu conexión.' };
+    }
+  }
+
+  auth.onAuthStateChanged(async user => {
+    if(user){
+      const validacion = await validarPertenenciaOrg(user);
+      if(!validacion.ok){
+        document.getElementById('admin-error').textContent = validacion.motivo;
+        document.getElementById('admin-error').style.display = 'block';
+        auth.signOut();
+        return;
+      }
+      document.getElementById('admin-login').style.display = 'none';
+      document.getElementById('admin-panel').style.display = 'block';
+      cargarPanelAdmin();
+    }
+  });
+
+  document.getElementById('btn-admin-entrar').addEventListener('click', async () => {
+    const email = document.getElementById('admin_email').value.trim();
+    const password = document.getElementById('admin_password').value;
+    const errorEl = document.getElementById('admin-error');
+    errorEl.style.display = 'none';
+    try{
+      const credencial = await auth.signInWithEmailAndPassword(email, password);
+      const validacion = await validarPertenenciaOrg(credencial.user);
+      if(!validacion.ok){
+        errorEl.textContent = validacion.motivo;
+        errorEl.style.display = 'block';
+        await auth.signOut();
+        return;
+      }
+      document.getElementById('admin-login').style.display = 'none';
+      document.getElementById('admin-panel').style.display = 'block';
+      cargarPanelAdmin();
+    }catch(err){
+      errorEl.textContent = 'Correo o contraseña incorrectos.';
+      errorEl.style.display = 'block';
+    }
+  });
+
+  document.getElementById('btn-admin-salir').addEventListener('click', () => {
+    auth.signOut();
+    document.getElementById('admin-login').style.display = 'block';
+    document.getElementById('admin-panel').style.display = 'none';
+    document.getElementById('admin_password').value = '';
+  });
+
+  document.getElementById('btn-admin-actualizar').addEventListener('click', cargarPanelAdmin);
+
+  document.getElementById('btn-admin-guardar-brigadas').addEventListener('click', async () => {
+    const lista = document.getElementById('admin_brigadas_lista').value
+      .split(',').map(s => s.trim()).filter(Boolean);
+    try{
+      await refConfigBrigadas().set({ lista });
+      brigadasPermitidas = lista;
+      alert('Lista de brigadas actualizada.');
+    }catch(err){
+      alert('No se pudo guardar. Revisa tu conexión.');
+    }
+  });
+
+  function calcularDuplicados(lista){
+    const conteo = {};
+    lista.forEach(p => {
+      const clave = (p.numero_doc || '').trim().toLowerCase() + '|' + (p.brigada || '').trim().toLowerCase();
+      if(!clave.trim().replace('|','')) return;
+      conteo[clave] = (conteo[clave] || 0) + 1;
+    });
+    return conteo;
+  }
+
+  function aplicarFiltrosAdmin(){
+    const q = document.getElementById('admin_buscador').value.trim().toLowerCase();
+    const brigadaSeleccionada = document.getElementById('admin_filtro_brigada').value;
+    const estado = document.getElementById('admin_filtro_estado').value;
+    let filtrados = adminPacientesCache;
+    if(brigadaSeleccionada){
+      filtrados = filtrados.filter(p => p.brigada === brigadaSeleccionada);
+    }
+    if(q){
+      filtrados = filtrados.filter(p =>
+        (p.nombre||'').toLowerCase().includes(q) ||
+        (p.apellidos||'').toLowerCase().includes(q) ||
+        (p.numero_doc||'').toLowerCase().includes(q) ||
+        (p.brigada||'').toLowerCase().includes(q)
+      );
+    }
+    if(estado === 'incompletos'){
+      filtrados = filtrados.filter(p => !p.diagnostico && !p.conducta);
+    }else if(estado === 'remisiones'){
+      filtrados = filtrados.filter(p => p.conducta === 'Remisión a especialista');
+    }else if(estado === 'duplicados'){
+      const conteo = calcularDuplicados(adminPacientesCache);
+      filtrados = filtrados.filter(p => {
+        const clave = (p.numero_doc || '').trim().toLowerCase() + '|' + (p.brigada || '').trim().toLowerCase();
+        return clave.trim().replace('|','') && conteo[clave] > 1;
+      });
+    }
+    dibujarListaAdmin(filtrados);
+  }
+
+  document.getElementById('admin_buscador').addEventListener('input', aplicarFiltrosAdmin);
+  document.getElementById('admin_filtro_brigada').addEventListener('change', aplicarFiltrosAdmin);
+  document.getElementById('admin_filtro_estado').addEventListener('change', aplicarFiltrosAdmin);
+
+  document.getElementById('btn-admin-exportar').addEventListener('click', () => {
+    const q = document.getElementById('admin_buscador').value.trim().toLowerCase();
+    const brigadaSeleccionada = document.getElementById('admin_filtro_brigada').value;
+    const estado = document.getElementById('admin_filtro_estado').value;
+    let filtrados = adminPacientesCache;
+    if(brigadaSeleccionada) filtrados = filtrados.filter(p => p.brigada === brigadaSeleccionada);
+    if(q) filtrados = filtrados.filter(p => (p.nombre||'').toLowerCase().includes(q) || (p.apellidos||'').toLowerCase().includes(q) || (p.numero_doc||'').toLowerCase().includes(q) || (p.brigada||'').toLowerCase().includes(q));
+    if(estado === 'incompletos') filtrados = filtrados.filter(p => !p.diagnostico && !p.conducta);
+    else if(estado === 'remisiones') filtrados = filtrados.filter(p => p.conducta === 'Remisión a especialista');
+    else if(estado === 'duplicados'){
+      const conteo = calcularDuplicados(adminPacientesCache);
+      filtrados = filtrados.filter(p => {
+        const clave = (p.numero_doc || '').trim().toLowerCase() + '|' + (p.brigada || '').trim().toLowerCase();
+        return clave.trim().replace('|','') && conteo[clave] > 1;
+      });
+    }
+    if(filtrados.length === 0){ alert('No hay pacientes para exportar con este filtro.'); return; }
+
+    const columnas = ['brigada','nombre','apellidos','tipo_doc','numero_doc','fecha_nacimiento','edad','sexo','telefono','correo','comunidad','acompanante','motivo','antecedentes_personales','antecedentes_familiares','medicacion_actual','av_sc_od','av_sc_oi','av_cc_od','av_cc_oi','av_ph_od','av_ph_oi','rx_od','rx_oi','rx_add','avcc_od','avcc_oi','avcc_add','pio_od','pio_oi','bmc_od','bmc_oi','fondo_od','fondo_oi','diagnostico','tratamiento','solicito','conducta','remitido_a','tomado_por','elaborada_por','observaciones','creado'];
+    const encabezado = ['Brigada','Nombres','Apellidos','Tipo Doc','CI/Documento','Fecha Nac','Edad','Sexo','Telefono','Correo','Procedencia','Acompanante','Motivo','Antecedentes Personales','Antecedentes Familiares','Medicacion Actual','AV SC OD','AV SC OI','AV CC OD','AV CC OI','AV PH OD','AV PH OI','Rx OD','Rx OI','Rx Add','Avcc OD','Avcc OI','Avcc Add','PIO OD','PIO OI','BMC OD','BMC OI','Fundoscopia OD','Fundoscopia OI','Diagnostico','Tratamiento','Solicito','Conducta','Remitido A','Tomado Por','Elaborada Por','Observaciones','Fecha Registro'];
+    const filas = filtrados.map(p => columnas.map(c => {
+      let v = p[c] ?? '';
+      if(c === 'creado' && v) v = new Date(v).toLocaleString('es-CO');
+      v = String(v).replace(/"/g,'""');
+      return `"${v}"`;
+    }).join(','));
+    const csv = [encabezado.join(','), ...filas].join('\n');
+    const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pacientes_administrador.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  async function cargarPanelAdmin(){
+    const contenedor = document.getElementById('admin-lista');
+    contenedor.innerHTML = '<div class="cargando">Cargando…</div>';
+    try{
+      const [snapshot, docBrigadas] = await Promise.all([
+        refPacientes().orderBy('creado', 'desc').get(),
+        refConfigBrigadas().get()
+      ]);
+      adminPacientesCache = snapshot.docs.map(doc => Object.assign({ id: doc.id }, doc.data()));
+
+      if(docBrigadas.exists && Array.isArray(docBrigadas.data().lista)){
+        brigadasPermitidas = docBrigadas.data().lista;
+        document.getElementById('admin_brigadas_lista').value = brigadasPermitidas.join(', ');
+      }
+
+      const conteos = {};
+      adminPacientesCache.forEach(p => {
+        const b = p.brigada || 'Sin brigada';
+        conteos[b] = (conteos[b] || 0) + 1;
+      });
+      const resumenEl = document.getElementById('admin-resumen');
+      const filasResumen = Object.entries(conteos).sort((a,b) => b[1]-a[1])
+        .map(([nombre, total]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde);"><span>${escapar(nombre)}</span><b>${total}</b></div>`).join('');
+      resumenEl.innerHTML = `<div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:600;"><span>Total general</span><span>${adminPacientesCache.length}</span></div>` + filasResumen;
+
+      const filtroBrigada = document.getElementById('admin_filtro_brigada');
+      const valorFiltroPrevio = filtroBrigada.value;
+      const nombresBrigadaConDatos = Object.keys(conteos).sort((a,b) => a.localeCompare(b, 'es'));
+      filtroBrigada.innerHTML = '<option value="">Todas las brigadas</option>' +
+        nombresBrigadaConDatos.map(n => `<option value="${escapar(n)}">${escapar(n)} (${conteos[n]})</option>`).join('');
+      if(nombresBrigadaConDatos.includes(valorFiltroPrevio)) filtroBrigada.value = valorFiltroPrevio;
+
+      aplicarFiltrosAdmin();
+    }catch(err){
+      contenedor.innerHTML = '<div class="vacio">No se pudo conectar con la base de datos. Revisa tu conexión o que hayas iniciado sesión correctamente.</div>';
+      console.error(err);
+    }
+  }
+
+  function dibujarListaAdmin(lista){
+    const contenedor = document.getElementById('admin-lista');
+    if(lista.length === 0){
+      contenedor.innerHTML = '<div class="vacio">No hay pacientes que coincidan.</div>';
+      return;
+    }
+    const conteoDuplicados = calcularDuplicados(adminPacientesCache);
+    contenedor.innerHTML = lista.map(p => {
+      const claveDup = (p.numero_doc || '').trim().toLowerCase() + '|' + (p.brigada || '').trim().toLowerCase();
+      const esDuplicado = claveDup.trim().replace('|','') && conteoDuplicados[claveDup] > 1;
+      const esIncompleto = !p.diagnostico && !p.conducta;
+      const insignias = `
+        ${esIncompleto ? '<span style="background:#F1EDE3;color:var(--tierra);font-size:0.72rem;padding:2px 8px;border-radius:10px;margin-right:6px;">Incompleto</span>' : ''}
+        ${esDuplicado ? '<span style="background:#F7E6E3;color:var(--rojo);font-size:0.72rem;padding:2px 8px;border-radius:10px;">Posible duplicado</span>' : ''}
+      `;
+      return `
+      <div class="tarjeta-paciente">
+        <div class="tarjeta-cabeza">
+          <div class="tarjeta-nombre">${escapar(p.nombre) || 'Sin nombre'} ${escapar(p.apellidos||'')}</div>
+          <div class="tarjeta-hora">${escapar(p.brigada||'')}</div>
+        </div>
+        <div style="margin:6px 0;">${insignias}</div>
+        <div class="tarjeta-datos">
+          <div><b>Documento:</b> ${escapar(p.numero_doc) || '—'}</div>
+          <div><b>Teléfono:</b> ${escapar(p.telefono) || '—'}</div>
+          <div><b>Correo:</b> ${escapar(p.correo) || '—'}</div>
+          <div><b>Motivo:</b> ${escapar(p.motivo) || '—'}</div>
+          <div><b>Diagnóstico:</b> ${escapar(p.diagnostico) || '—'}</div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:12px;">
+          <button type="button" class="btn-secundario" onclick="editarPacienteAdmin('${escaparAtributo(p.id)}')">Editar</button>
+          <button type="button" class="btn-secundario" style="border-color:var(--rojo);color:var(--rojo);" onclick="eliminarPacienteAdmin('${escaparAtributo(p.id)}')">Eliminar</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  const CAMPOS_FORMULARIO = [
+    'id','brigada','nombre','apellidos','tipo_doc','numero_doc','fecha_nacimiento','edad','sexo',
+    'telefono','correo','comunidad','acompanante','motivo','medicacion_actual',
+    'av_sc_od','av_sc_oi','av_cc_od','av_cc_oi','av_ph_od','av_ph_oi',
+    'rx_od','rx_oi','rx_add','avcc_od','avcc_oi','avcc_add',
+    'pio_od','pio_oi','bmc_od','bmc_oi','fondo_od','fondo_oi',
+    'diagnostico','tratamiento','conducta','remitido_a',
+    'tomado_por','elaborada_por','observaciones'
+  ];
+
+  window.editarPacienteAdmin = function(id){
+    const p = adminPacientesCache.find(x => String(x.id) === String(id));
+    if(!p){ alert('No se encontró el paciente.'); return; }
+
+    CAMPOS_FORMULARIO.forEach(campoId => {
+      const el = document.getElementById(campoId);
+      if(el) el.value = p[campoId] || '';
+    });
+    marcarCasillas('personales', p.antecedentes_personales);
+    marcarCasillas('familiares', p.antecedentes_familiares);
+    marcarCasillas('solicito', p.solicito);
+
+    idEnEdicion = id;
+    origenEdicion = 'admin';
+    document.getElementById('btn-guardar').textContent = 'Guardar cambios';
+    document.getElementById('btn-cancelar-edicion').style.display = 'block';
+    cambiarVista('registro');
+    window.scrollTo({top:0, behavior:'smooth'});
+  };
+
+  window.editarPacienteLocal = function(creado){
+    const p = pacientes.find(x => Number(x.creado) === Number(creado));
+    if(!p){ alert('No se encontró el paciente en este dispositivo.'); return; }
+
+    CAMPOS_FORMULARIO.forEach(campoId => {
+      const el = document.getElementById(campoId);
+      if(el) el.value = p[campoId] || '';
+    });
+    marcarCasillas('personales', p.antecedentes_personales);
+    marcarCasillas('familiares', p.antecedentes_familiares);
+    marcarCasillas('solicito', p.solicito);
+
+    idEnEdicion = p.id;
+    origenEdicion = 'lista';
+    document.getElementById('btn-guardar').textContent = 'Guardar cambios';
+    document.getElementById('btn-cancelar-edicion').style.display = 'block';
+    cambiarVista('registro');
+    window.scrollTo({top:0, behavior:'smooth'});
+  };
+
+  document.getElementById('btn-cancelar-edicion').addEventListener('click', () => {
+    idEnEdicion = null;
+    document.getElementById('form-registro').reset();
+    document.getElementById('btn-guardar').textContent = modoPaciente ? 'Enviar mi inscripción' : 'Registrar paciente';
+    document.getElementById('btn-cancelar-edicion').style.display = 'none';
+    cambiarVista(origenEdicion);
+  });
+
+  window.eliminarPacienteAdmin = async function(id){
+    if(!confirm('¿Seguro que quieres eliminar este registro? Esta acción no se puede deshacer.')) return;
+    try{
+      await refPacientes().doc(id).delete();
+      cargarPanelAdmin();
+    }catch(err){
+      alert('No se pudo eliminar. Revisa tu conexión.');
+    }
+  };
+
+  function mostrarBloqueo(mensaje){
+    document.getElementById('pantalla-bloqueo-mensaje').textContent = mensaje;
+    document.getElementById('pantalla-bloqueo').style.display = 'flex';
+  }
+
+  async function verificarOrganizacionActiva(){
+    if(!ORG_ID){
+      mostrarBloqueo('Este link no incluye la organización a la que pertenece. Verifica que el enlace esté completo (debe incluir "?org=...").');
+      return false;
+    }
+    try{
+      const doc = await refOrg().get();
+      if(!doc.exists){
+        mostrarBloqueo('No encontramos una organización activa con este enlace. Comunícate con el proveedor del servicio.');
+        return false;
+      }
+      if(doc.data().activo !== true){
+        mostrarBloqueo('El acceso de esta organización está suspendido actualmente. Comunícate con el proveedor del servicio para reactivarlo.');
+        return false;
+      }
+      return true;
+    }catch(err){
+      console.warn('No se pudo verificar el estado de la organización (posible falta de conexión):', err);
+      return true;
+    }
+  }
+
+  verificarOrganizacionActiva();
+
+  cargarPacientes();
+})();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(err => console.error('Service worker no registrado:', err));
+  });
+}
+
+</script>
+
+</body>
+</html>
