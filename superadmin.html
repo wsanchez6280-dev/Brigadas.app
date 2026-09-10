@@ -273,11 +273,11 @@
   };
 
   window.copiarLinks = function(orgId){
-    const base = window.location.origin.replace('/superadmin.html','');
+    const base = window.location.href.replace(/superadmin\.html.*$/, '');
     const links =
-`Personal: ${base}/?org=${orgId}
-Pacientes: ${base}/?org=${orgId}&modo=paciente
-Administrador: ${base}/?org=${orgId} (pestaña Administrador)`;
+`Personal: ${base}?org=${orgId}
+Pacientes: ${base}?org=${orgId}&modo=paciente
+Administrador: ${base}?org=${orgId} (pestaña Administrador)`;
     navigator.clipboard.writeText(links).then(() => alert('Links copiados al portapapeles:\n\n' + links));
   };
 </script>
