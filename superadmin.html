@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Superadministrador — Brigadas de Salud Visual</title>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<style>
+  :root{
+    --verde-oscuro:#1F4B3F;
+    --verde-medio:#2E6B57;
+    --hueso:#FBFAF7;
+    --arena:#F1EDE3;
+    --tierra:#B5651D;
+    --texto:#20261F;
+    --texto-suave:#5B6660;
+    --borde:#D7D2C4;
+    --rojo:#A83232;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:var(--hueso);
+    color:var(--texto);
+  }
+  .marca{
+    background:var(--verde-oscuro);
+    color:#fff;
+    padding:20px;
+  }
+  .marca h1{ margin:0; font-size:1.3rem; font-weight:500; }
+  main{ max-width:900px; margin:0 auto; padding:24px 20px 80px; }
+  .grupo{ margin-bottom:16px; }
+  label{ display:block; font-size:0.82rem; color:var(--texto-suave); margin-bottom:6px; }
+  input, select{
+    width:100%; padding:10px 12px; border:1px solid var(--borde); border-radius:4px; font-size:1rem;
+  }
+  button{
+    font-family:inherit; padding:10px 18px; border-radius:4px; font-size:0.9rem; cursor:pointer;
+  }
+  .btn-primario{ background:var(--verde-oscuro); color:#fff; border:none; }
+  .btn-secundario{ background:#fff; border:1px solid var(--verde-oscuro); color:var(--verde-oscuro); }
+  .btn-peligro{ background:#fff; border:1px solid var(--rojo); color:var(--rojo); }
+  .tarjeta{
+    background:#fff; border:1px solid var(--borde); border-left:4px solid var(--verde-medio);
+    border-radius:4px; padding:16px 18px; margin-bottom:12px;
+  }
+  .tarjeta.inactiva{ border-left-color:var(--rojo); opacity:0.75; }
+  .fila-tarjeta{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+  .estado{ font-size:0.8rem; padding:3px 10px; border-radius:12px; font-weight:600; }
+  .estado.activo{ background:#E8F1EC; color:var(--verde-oscuro); }
+  .estado.inactivo{ background:#F7E6E3; color:var(--rojo); }
+  .seccion-titulo{ font-size:1.1rem; margin:28px 0 14px; padding-bottom:8px; border-bottom:1px solid var(--borde); }
+  .mensaje-error{ background:#F7E6E3; color:var(--rojo); padding:10px 14px; border-radius:4px; margin-bottom:14px; display:none; }
+  .datos-org{ font-size:0.85rem; color:var(--texto-suave); margin-top:6px; }
+</style>
+</head>
+<body>
+
+<div class="marca"><h1>Panel de Superadministrador — Brigadas de Salud Visual</h1></div>
+
+<main>
+  <div id="login-super">
+    <div class="grupo">
+      <label>Correo</label>
+      <input type="email" id="su_email">
+    </div>
+    <div class="grupo">
+      <label>Contraseña</label>
+      <input type="password" id="su_password">
+    </div>
+    <div class="mensaje-error" id="su_error"></div>
+    <button class="btn-primario" id="btn_su_entrar">Ingresar</button>
+  </div>
+
+  <div id="panel-super" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="color:var(--texto-suave);font-size:0.9rem;" id="su_correo_actual"></span>
+      <button class="btn-secundario" id="btn_su_salir">Cerrar sesión</button>
+    </div>
+
+    <div class="seccion-titulo">Crear nueva organización (cliente)</div>
+    <div class="grupo">
+      <label>ID de la organización (sin espacios, ej. hce-manabi)</label>
+      <input type="text" id="nueva_org_id" placeholder="hce-manabi">
+    </div>
+    <div class="grupo">
+      <label>Nombre para mostrar</label>
+      <input type="text" id="nueva_org_nombre" placeholder="Hospital Cristiano de Especialidades">
+    </div>
+    <div class="grupo">
+      <label>Fecha de vencimiento del plan</label>
+      <input type="date" id="nueva_org_vencimiento">
+    </div>
+    <button class="btn-primario" id="btn_crear_org">Crear organización</button>
+    <p class="datos-org">
+      Esto solo crea la organización. Para darle acceso de administrador a alguien
+      de esa organización, baja a "Vincular administrador" más abajo.
+    </p>
+
+    <div class="seccion-titulo">Vincular administrador a una organización</div>
+    <div class="grupo">
+      <label>UID del usuario (cópialo desde Firebase Console → Authentication → Users)</label>
+      <input type="text" id="vincular_uid" placeholder="Ej. aB3dEfG7hI...">
+    </div>
+    <div class="grupo">
+      <label>Correo (solo de referencia)</label>
+      <input type="email" id="vincular_correo" placeholder="admin@hospital.com">
+    </div>
+    <div class="grupo">
+      <label>ID de la organización a la que pertenece</label>
+      <input type="text" id="vincular_org_id" placeholder="hce-manabi">
+    </div>
+    <button class="btn-primario" id="btn_vincular_admin">Vincular como administrador</button>
+    <p class="datos-org">
+      Primero crea el usuario en Firebase Console → Authentication → Users → Add user
+      (con su correo y una contraseña), copia el UID que le asigna Firebase, y pégalo aquí.
+    </p>
+
+    <div class="seccion-titulo">Organizaciones existentes</div>
+    <div id="lista_orgs"><p>Cargando…</p></div>
+  </div>
+</main>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCp0d-8QIhoqgjG5JbtFGsFF68TglRvNFc",
+    authDomain: "brigadas-salud-visual.firebaseapp.com",
+    projectId: "brigadas-salud-visual",
+    storageBucket: "brigadas-salud-visual.firebasestorage.app",
+    messagingSenderId: "89644852281",
+    appId: "1:89644852281:web:f9e95b0f53a150d2bd99e8"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const auth = firebase.auth();
+
+  function escapar(t){ const d=document.createElement('div'); d.textContent=t||''; return d.innerHTML; }
+
+  async function esSuperadmin(uid){
+    try{
+      const doc = await db.collection('usuarios').doc(uid).get();
+      return doc.exists && doc.data().rol === 'superadmin';
+    }catch(e){ return false; }
+  }
+
+  auth.onAuthStateChanged(async (user) => {
+    if(!user) return;
+    if(await esSuperadmin(user.uid)){
+      document.getElementById('login-super').style.display = 'none';
+      document.getElementById('panel-super').style.display = 'block';
+      document.getElementById('su_correo_actual').textContent = user.email;
+      cargarOrganizaciones();
+    }else{
+      document.getElementById('su_error').textContent = 'Tu usuario no tiene permisos de superadministrador.';
+      document.getElementById('su_error').style.display = 'block';
+      auth.signOut();
+    }
+  });
+
+  document.getElementById('btn_su_entrar').addEventListener('click', async () => {
+    const email = document.getElementById('su_email').value.trim();
+    const password = document.getElementById('su_password').value;
+    const errorEl = document.getElementById('su_error');
+    errorEl.style.display = 'none';
+    try{
+      await auth.signInWithEmailAndPassword(email, password);
+    }catch(err){
+      errorEl.textContent = 'Correo o contraseña incorrectos.';
+      errorEl.style.display = 'block';
+    }
+  });
+
+  document.getElementById('btn_su_salir').addEventListener('click', () => {
+    auth.signOut();
+    document.getElementById('login-super').style.display = 'block';
+    document.getElementById('panel-super').style.display = 'none';
+  });
+
+  document.getElementById('btn_crear_org').addEventListener('click', async () => {
+    const orgId = document.getElementById('nueva_org_id').value.trim();
+    const nombre = document.getElementById('nueva_org_nombre').value.trim();
+    const vencimiento = document.getElementById('nueva_org_vencimiento').value;
+
+    if(!orgId || !nombre){
+      alert('Completa al menos el ID y el nombre.');
+      return;
+    }
+
+    try{
+      await db.collection('organizaciones').doc(orgId).set({
+        nombre, activo: true, fechaVencimiento: vencimiento || null, creado: Date.now()
+      });
+      alert('Organización "' + nombre + '" creada y activa. Ahora vincula un administrador más abajo.');
+      document.getElementById('nueva_org_id').value = '';
+      document.getElementById('nueva_org_nombre').value = '';
+      document.getElementById('nueva_org_vencimiento').value = '';
+      cargarOrganizaciones();
+    }catch(err){
+      alert('No se pudo crear: ' + err.message);
+    }
+  });
+
+  document.getElementById('btn_vincular_admin').addEventListener('click', async () => {
+    const uid = document.getElementById('vincular_uid').value.trim();
+    const correo = document.getElementById('vincular_correo').value.trim();
+    const orgId = document.getElementById('vincular_org_id').value.trim();
+
+    if(!uid || !orgId){
+      alert('Completa el UID y el ID de la organización.');
+      return;
+    }
+
+    try{
+      await db.collection('usuarios').doc(uid).set({
+        organizacionId: orgId, rol: 'admin', correo: correo || null
+      });
+      alert('Usuario vinculado correctamente a "' + orgId + '".');
+      document.getElementById('vincular_uid').value = '';
+      document.getElementById('vincular_correo').value = '';
+      document.getElementById('vincular_org_id').value = '';
+    }catch(err){
+      alert('No se pudo vincular: ' + err.message);
+    }
+  });
+
+  async function cargarOrganizaciones(){
+    const contenedor = document.getElementById('lista_orgs');
+    contenedor.innerHTML = '<p>Cargando…</p>';
+    try{
+      const snap = await db.collection('organizaciones').orderBy('creado', 'desc').get();
+      if(snap.empty){
+        contenedor.innerHTML = '<p>No hay organizaciones creadas todavía.</p>';
+        return;
+      }
+      contenedor.innerHTML = snap.docs.map(doc => {
+        const d = doc.data();
+        return `
+          <div class="tarjeta ${d.activo ? '' : 'inactiva'}">
+            <div class="fila-tarjeta">
+              <div>
+                <b>${escapar(d.nombre)}</b>
+                <div class="datos-org">ID: ${escapar(doc.id)} · Vence: ${escapar(d.fechaVencimiento) || 'sin definir'}</div>
+              </div>
+              <span class="estado ${d.activo ? 'activo' : 'inactivo'}">${d.activo ? 'Activo' : 'Suspendido'}</span>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:12px;">
+              ${d.activo
+                ? `<button class="btn-peligro" onclick="cambiarEstadoOrg('${doc.id}', false)">Suspender (no pagó)</button>`
+                : `<button class="btn-secundario" onclick="cambiarEstadoOrg('${doc.id}', true)">Reactivar</button>`
+              }
+              <button class="btn-secundario" onclick="copiarLinks('${doc.id}')">Copiar links del cliente</button>
+            </div>
+          </div>`;
+      }).join('');
+    }catch(err){
+      contenedor.innerHTML = '<p>No se pudo cargar: ' + err.message + '</p>';
+    }
+  }
+
+  window.cambiarEstadoOrg = async function(orgId, nuevoEstado){
+    const accion = nuevoEstado ? 'reactivar' : 'suspender (por falta de pago u otro motivo)';
+    if(!confirm(`¿Seguro que quieres ${accion} a "${orgId}"?`)) return;
+    try{
+      await db.collection('organizaciones').doc(orgId).update({ activo: nuevoEstado });
+      cargarOrganizaciones();
+    }catch(err){
+      alert('No se pudo actualizar: ' + err.message);
+    }
+  };
+
+  window.copiarLinks = function(orgId){
+    const base = window.location.origin.replace('/superadmin.html','');
+    const links =
+`Personal: ${base}/?org=${orgId}
+Pacientes: ${base}/?org=${orgId}&modo=paciente
+Administrador: ${base}/?org=${orgId} (pestaña Administrador)`;
+    navigator.clipboard.writeText(links).then(() => alert('Links copiados al portapapeles:\n\n' + links));
+  };
+</script>
+
+</body>
+</html>
