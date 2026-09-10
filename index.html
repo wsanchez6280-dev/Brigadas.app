@@ -312,7 +312,7 @@
 
   <div class="vista activa" id="vista-registro">
     <div class="aviso-compartido" id="aviso-personal">
-      Estos datos se guardan únicamente en este dispositivo y navegador, sin necesidad de internet. Si varios dispositivos van a registrar pacientes, cada uno tendrá su propia lista: al final del día, exporta el CSV de cada uno y júntalos en una sola hoja de Excel.
+      Estos datos se comparten en línea con todo el equipo de la organización: cualquiera con este link ve la misma lista actualizada y puede completar la ficha de un paciente registrado desde otro dispositivo. Si el celular se queda sin internet, sigue funcionando con la última copia guardada y se actualiza sola al recuperar conexión.
     </div>
     <div class="aviso-compartido" id="aviso-paciente" style="display:none;">
       Tus datos serán usados únicamente por el equipo médico de la brigada, para tu atención y seguimiento.
@@ -555,7 +555,7 @@
       <input type="text" id="buscador" placeholder="Buscar por nombre, documento o comunidad…">
       <button class="btn-secundario" id="btn-exportar">Exportar a CSV</button>
       <button class="btn-secundario" id="btn-actualizar">Actualizar</button>
-      <button class="btn-secundario" id="btn-borrar-local" style="border-color:var(--rojo);color:var(--rojo);">Borrar todo (solo este dispositivo)</button>
+      <button class="btn-secundario" id="btn-borrar-local" style="border-color:var(--rojo);color:var(--rojo);">Limpiar copia de respaldo local</button>
     </div>
     <div id="contenedor-lista">
       <div class="cargando">Cargando pacientes…</div>
@@ -738,20 +738,24 @@
 
   async function cargarPacientes(){
     const contenedor = document.getElementById('contenedor-lista');
+    contenedor.innerHTML = '<div class="cargando">Cargando pacientes…</div>';
     try{
+      const snapshot = await refPacientes().orderBy('creado', 'desc').get();
+      pacientes = snapshot.docs.map(doc => Object.assign({ id: doc.id }, doc.data()));
+      guardarPacientesEnDisco(pacientes); // copia de respaldo para cuando no haya internet
+    }catch(err){
+      console.warn('No se pudo leer la lista en línea, usando la copia guardada en este dispositivo:', err);
       pacientes = leerPacientesGuardados().sort((a,b) => (b.creado||0) - (a.creado||0));
-      if(pacientes.length === 0){
-        actualizarContador(0);
-        contenedor.innerHTML = '<div class="vacio">Todavía no hay pacientes registrados en este dispositivo. Usa la pestaña "Nuevo registro" para inscribir al primero.</div>';
-        return;
-      }
-      actualizarContador(pacientes.length);
-      poblarBrigadas(pacientes);
-      aplicarFiltros();
-    }catch(e){
-      contenedor.innerHTML = '<div class="vacio">No se pudo cargar la lista guardada en este dispositivo.</div>';
-      console.error(e);
     }
+
+    if(pacientes.length === 0){
+      actualizarContador(0);
+      contenedor.innerHTML = '<div class="vacio">Todavía no hay pacientes registrados. Usa la pestaña "Nuevo registro" para inscribir al primero.</div>';
+      return;
+    }
+    actualizarContador(pacientes.length);
+    poblarBrigadas(pacientes);
+    aplicarFiltros();
   }
 
   function escapar(texto){
@@ -1064,10 +1068,9 @@
   document.getElementById('btn-actualizar').addEventListener('click', cargarPacientes);
 
   document.getElementById('btn-borrar-local').addEventListener('click', () => {
-    if(!confirm('¿Borrar todos los pacientes guardados en ESTE dispositivo? Esto no afecta lo que ya está guardado en la base de datos (Firestore), solo la copia local de este celular/computador.')) return;
+    if(!confirm('¿Borrar la copia de respaldo guardada en ESTE dispositivo? La lista se va a recargar de inmediato desde la base de datos en línea (si hay conexión). Esto no elimina ningún paciente, solo limpia la copia usada para funcionar sin internet.')) return;
     localStorage.removeItem(CLAVE_DATOS);
     cargarPacientes();
-    alert('Listo, la lista local de este dispositivo quedó en cero.');
   });
 
   document.getElementById('btn-exportar').addEventListener('click', () => {
