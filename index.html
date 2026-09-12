@@ -295,8 +295,8 @@
 <div class="marca">
   <div class="marca-inner">
     <div style="display:flex;align-items:center;gap:14px;">
-      <img src="./logo-hospital.png" alt="Logo Hospital Cristiano de Especialidades" style="height:44px;width:44px;object-fit:contain;flex-shrink:0;">
-      <h1>Registro de pacientes — Brigadas de salud visual</h1>
+      <img id="logo-organizacion" src="./icon-192.png" alt="Logo de la organización" style="height:44px;width:44px;object-fit:contain;flex-shrink:0;border-radius:6px;">
+      <h1 id="titulo-organizacion">Registro de pacientes — Brigadas de salud visual</h1>
     </div>
     <div class="contador" id="contador">Cargando…</div>
   </div>
@@ -545,20 +545,34 @@
   </div>
 
   <div class="vista" id="vista-lista">
-    <div class="aviso-compartido" style="margin-bottom:16px;">
-      Recuerda exportar el CSV con frecuencia (por ejemplo, al final de cada jornada) y guardarlo en un lugar seguro. Si se borra el historial o los datos del navegador de este dispositivo, se pierden los registros que no hayas exportado.
+    <div id="lista-login" style="display:none;">
+      <div class="aviso-compartido">
+        Esta sección está protegida con una contraseña definida por tu administrador.
+      </div>
+      <div class="grupo">
+        <label>Contraseña del personal</label>
+        <input type="password" id="lista_clave_input">
+      </div>
+      <div class="mensaje-error" id="lista-clave-error"></div>
+      <button class="btn-secundario" id="btn-lista-entrar">Ingresar</button>
     </div>
-    <div class="barra-lista">
-      <select id="filtro-brigada">
-        <option value="">Todas las brigadas</option>
-      </select>
-      <input type="text" id="buscador" placeholder="Buscar por nombre, documento o comunidad…">
-      <button class="btn-secundario" id="btn-exportar">Exportar a CSV</button>
-      <button class="btn-secundario" id="btn-actualizar">Actualizar</button>
-      <button class="btn-secundario" id="btn-borrar-local" style="border-color:var(--rojo);color:var(--rojo);">Limpiar copia de respaldo local</button>
-    </div>
-    <div id="contenedor-lista">
-      <div class="cargando">Cargando pacientes…</div>
+
+    <div id="lista-contenido" style="display:none;">
+      <div class="aviso-compartido" style="margin-bottom:16px;">
+        Recuerda exportar el CSV con frecuencia (por ejemplo, al final de cada jornada) y guardarlo en un lugar seguro. Si se borra el historial o los datos del navegador de este dispositivo, se pierden los registros que no hayas exportado.
+      </div>
+      <div class="barra-lista">
+        <select id="filtro-brigada">
+          <option value="">Todas las brigadas</option>
+        </select>
+        <input type="text" id="buscador" placeholder="Buscar por nombre, documento o comunidad…">
+        <button class="btn-secundario" id="btn-exportar">Exportar a CSV</button>
+        <button class="btn-secundario" id="btn-actualizar">Actualizar</button>
+        <button class="btn-secundario" id="btn-borrar-local" style="border-color:var(--rojo);color:var(--rojo);">Limpiar copia de respaldo local</button>
+      </div>
+      <div id="contenedor-lista">
+        <div class="cargando">Cargando pacientes…</div>
+      </div>
     </div>
   </div>
 
@@ -587,6 +601,25 @@
 
       <div class="seccion-titulo">Resumen por brigada</div>
       <div id="admin-resumen" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:24px;"></div>
+
+      <div class="seccion-titulo">Logo de la institución</div>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;">
+        <img id="admin-logo-preview" src="./icon-192.png" style="height:60px;width:60px;object-fit:contain;border-radius:8px;border:1px solid var(--borde);">
+        <div style="flex:1;">
+          <input type="file" id="admin_logo_archivo" accept="image/png,image/jpeg">
+        </div>
+      </div>
+      <button class="btn-secundario" id="btn-admin-subir-logo" style="margin-bottom:24px;">Subir / cambiar logo</button>
+
+      <div class="seccion-titulo">Contraseña de acceso a "Pacientes inscritos"</div>
+      <div class="aviso-compartido" style="margin-bottom:14px;">
+        Como ahora todo el equipo ve la misma lista de pacientes sin iniciar sesión, puedes poner una contraseña simple aquí para que solo tu personal (con esa clave) pueda abrir la pestaña "Pacientes inscritos". Déjala vacía si no quieres pedir ninguna.
+      </div>
+      <div class="grupo">
+        <label>Contraseña para el personal</label>
+        <input type="text" id="admin_clave_lista" placeholder="Ej. brigada2026">
+      </div>
+      <button class="btn-secundario" id="btn-admin-guardar-clave" style="margin-bottom:24px;">Guardar contraseña</button>
 
       <div class="seccion-titulo">Brigadas permitidas</div>
       <div class="grupo">
@@ -686,6 +719,8 @@
   const parametrosPagina = new URLSearchParams(window.location.search);
   const modoPaciente = parametrosPagina.get('modo') === 'paciente';
 
+  const CLAVE_YA_REGISTRADO = 'brigada_ya_registrado_' + ORG_ID;
+
   if(modoPaciente){
     document.body.classList.add('modo-paciente');
     document.getElementById('aviso-paciente').style.display = 'block';
@@ -698,6 +733,9 @@
       campoBrigada.readOnly = true;
       campoBrigada.style.background = '#F1EDE3';
     }
+    if(localStorage.getItem(CLAVE_YA_REGISTRADO) === 'si'){
+      mostrarBloqueo('Ya completaste tu inscripción desde este celular. Si necesitas corregir algo, comunícate con el personal de la brigada.');
+    }
   }
 
   const tabs = document.querySelectorAll('.tab');
@@ -709,10 +747,61 @@
   function cambiarVista(nombre){
     tabs.forEach(x => x.classList.toggle('activa', x.dataset.vista === nombre));
     Object.entries(vistas).forEach(([clave, el]) => el.classList.toggle('activa', clave === nombre));
-    if(nombre === 'lista') cargarPacientes();
+    if(nombre === 'lista') entrarAPacientesInscritos();
   }
   tabs.forEach(t => {
     t.addEventListener('click', () => cambiarVista(t.dataset.vista));
+  });
+
+  const CLAVE_DESBLOQUEO_LISTA = 'brigada_lista_desbloqueada_' + ORG_ID;
+
+  async function entrarAPacientesInscritos(){
+    if(sessionStorage.getItem(CLAVE_DESBLOQUEO_LISTA) === 'si'){
+      document.getElementById('lista-login').style.display = 'none';
+      document.getElementById('lista-contenido').style.display = 'block';
+      cargarPacientes();
+      return;
+    }
+    try{
+      const doc = await refOrg().get();
+      const claveConfigurada = doc.exists ? (doc.data().claveListaPacientes || '') : '';
+      if(!claveConfigurada){
+        sessionStorage.setItem(CLAVE_DESBLOQUEO_LISTA, 'si');
+        document.getElementById('lista-login').style.display = 'none';
+        document.getElementById('lista-contenido').style.display = 'block';
+        cargarPacientes();
+      }else{
+        document.getElementById('lista-login').style.display = 'block';
+        document.getElementById('lista-contenido').style.display = 'none';
+      }
+    }catch(err){
+      // Sin conexión: dejamos ver el contenido con la copia local, para no bloquear el trabajo en campo.
+      document.getElementById('lista-login').style.display = 'none';
+      document.getElementById('lista-contenido').style.display = 'block';
+      cargarPacientes();
+    }
+  }
+
+  document.getElementById('btn-lista-entrar').addEventListener('click', async () => {
+    const intento = document.getElementById('lista_clave_input').value;
+    const errorEl = document.getElementById('lista-clave-error');
+    errorEl.style.display = 'none';
+    try{
+      const doc = await refOrg().get();
+      const claveConfigurada = doc.exists ? (doc.data().claveListaPacientes || '') : '';
+      if(intento === claveConfigurada){
+        sessionStorage.setItem(CLAVE_DESBLOQUEO_LISTA, 'si');
+        document.getElementById('lista-login').style.display = 'none';
+        document.getElementById('lista-contenido').style.display = 'block';
+        cargarPacientes();
+      }else{
+        errorEl.textContent = 'Contraseña incorrecta.';
+        errorEl.style.display = 'block';
+      }
+    }catch(err){
+      errorEl.textContent = 'No se pudo verificar la contraseña. Revisa tu conexión.';
+      errorEl.style.display = 'block';
+    }
   });
 
   function actualizarContador(n){
@@ -1212,10 +1301,17 @@
       const listaActual = leerPacientesGuardados();
       listaActual.push(paciente);
       guardarPacientesEnDisco(listaActual);
-      mensajeOk.style.display = 'block';
-      e.target.reset();
-      window.scrollTo({top:0, behavior:'smooth'});
-      cargarPacientes();
+
+      if(modoPaciente){
+        localStorage.setItem(CLAVE_YA_REGISTRADO, 'si');
+        e.target.reset();
+        mostrarBloqueo('¡Gracias! Tu inscripción fue registrada correctamente. Si necesitas corregir algo, comunícate con el personal de la brigada.');
+      }else{
+        mensajeOk.style.display = 'block';
+        e.target.reset();
+        window.scrollTo({top:0, behavior:'smooth'});
+        cargarPacientes();
+      }
     }catch(err){
       mensajeError.textContent = 'No se pudo guardar el registro en este dispositivo. Puede que la memoria del navegador esté llena.';
       mensajeError.style.display = 'block';
@@ -1345,6 +1441,68 @@
     }
   });
 
+  document.getElementById('btn-admin-guardar-clave').addEventListener('click', async () => {
+    const clave = document.getElementById('admin_clave_lista').value.trim();
+    try{
+      await refOrg().update({ claveListaPacientes: clave });
+      alert(clave ? 'Contraseña guardada. El personal deberá ingresarla para ver "Pacientes inscritos".' : 'Contraseña quitada. Cualquiera con el link podrá ver "Pacientes inscritos" sin clave.');
+    }catch(err){
+      alert('No se pudo guardar: ' + err.message);
+    }
+  });
+
+  function comprimirImagenABase64(archivo, maxLado, calidad){
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+      lector.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('El archivo no es una imagen válida.'));
+        img.onload = () => {
+          let { width, height } = img;
+          if(width > height && width > maxLado){
+            height = Math.round(height * (maxLado / width));
+            width = maxLado;
+          }else if(height > maxLado){
+            width = Math.round(width * (maxLado / height));
+            height = maxLado;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', calidad));
+        };
+        img.src = lector.result;
+      };
+      lector.readAsDataURL(archivo);
+    });
+  }
+
+  document.getElementById('btn-admin-subir-logo').addEventListener('click', async () => {
+    const archivo = document.getElementById('admin_logo_archivo').files[0];
+    if(!archivo){ alert('Primero selecciona una imagen.'); return; }
+    const boton = document.getElementById('btn-admin-subir-logo');
+    boton.disabled = true;
+    boton.textContent = 'Procesando…';
+    try{
+      const base64 = await comprimirImagenABase64(archivo, 300, 0.75);
+      if(base64.length > 700000){
+        alert('La imagen sigue siendo muy pesada incluso comprimida. Intenta con una más simple (ideal: un logo con pocos colores).');
+        return;
+      }
+      await refOrg().update({ logoBase64: base64 });
+      document.getElementById('logo-organizacion').src = base64;
+      document.getElementById('admin-logo-preview').src = base64;
+      alert('Logo actualizado correctamente.');
+    }catch(err){
+      alert('No se pudo procesar el logo: ' + err.message);
+    }finally{
+      boton.disabled = false;
+      boton.textContent = 'Subir / cambiar logo';
+    }
+  });
+
   function calcularDuplicados(lista){
     const conteo = {};
     lista.forEach(p => {
@@ -1429,9 +1587,10 @@
     const contenedor = document.getElementById('admin-lista');
     contenedor.innerHTML = '<div class="cargando">Cargando…</div>';
     try{
-      const [snapshot, docBrigadas] = await Promise.all([
+      const [snapshot, docBrigadas, docOrg] = await Promise.all([
         refPacientes().orderBy('creado', 'desc').get(),
-        refConfigBrigadas().get()
+        refConfigBrigadas().get(),
+        refOrg().get()
       ]);
       adminPacientesCache = snapshot.docs.map(doc => Object.assign({ id: doc.id }, doc.data()));
 
@@ -1439,6 +1598,11 @@
         brigadasPermitidas = docBrigadas.data().lista;
         document.getElementById('admin_brigadas_lista').value = brigadasPermitidas.join(', ');
       }
+
+      if(docOrg.exists && docOrg.data().logoBase64){
+        document.getElementById('admin-logo-preview').src = docOrg.data().logoBase64;
+      }
+      document.getElementById('admin_clave_lista').value = (docOrg.exists && docOrg.data().claveListaPacientes) || '';
 
       const conteos = {};
       adminPacientesCache.forEach(p => {
@@ -1588,6 +1752,13 @@
       if(doc.data().activo !== true){
         mostrarBloqueo('El acceso de esta organización está suspendido actualmente. Comunícate con el proveedor del servicio para reactivarlo.');
         return false;
+      }
+      if(doc.data().nombre){
+        document.getElementById('titulo-organizacion').textContent = doc.data().nombre;
+        document.title = doc.data().nombre;
+      }
+      if(doc.data().logoBase64){
+        document.getElementById('logo-organizacion').src = doc.data().logoBase64;
       }
       return true;
     }catch(err){
