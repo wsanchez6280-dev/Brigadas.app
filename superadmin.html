@@ -243,9 +243,16 @@
             <div class="fila-tarjeta">
               <div>
                 <b>${escapar(d.nombre)}</b>
-                <div class="datos-org">ID: ${escapar(doc.id)} · Vence: ${escapar(d.fechaVencimiento) || 'sin definir'}</div>
+                <div class="datos-org">ID: ${escapar(doc.id)}</div>
               </div>
               <span class="estado ${d.activo ? 'activo' : 'inactivo'}">${d.activo ? 'Activo' : 'Suspendido'}</span>
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:10px;margin-top:12px;flex-wrap:wrap;">
+              <div>
+                <label style="display:block;font-size:0.78rem;color:var(--texto-suave);margin-bottom:4px;">Fecha de vencimiento</label>
+                <input type="date" id="fecha_${doc.id}" value="${escapar(d.fechaVencimiento || '')}" style="padding:8px;">
+              </div>
+              <button class="btn-secundario" onclick="guardarFechaVencimiento('${doc.id}')">Guardar fecha</button>
             </div>
             <div style="display:flex;gap:10px;margin-top:12px;">
               ${d.activo
@@ -260,6 +267,16 @@
       contenedor.innerHTML = '<p>No se pudo cargar: ' + err.message + '</p>';
     }
   }
+
+  window.guardarFechaVencimiento = async function(orgId){
+    const nuevaFecha = document.getElementById('fecha_' + orgId).value;
+    try{
+      await db.collection('organizaciones').doc(orgId).update({ fechaVencimiento: nuevaFecha || null });
+      alert('Fecha de vencimiento actualizada.');
+    }catch(err){
+      alert('No se pudo guardar: ' + err.message);
+    }
+  };
 
   window.cambiarEstadoOrg = async function(orgId, nuevoEstado){
     const accion = nuevoEstado ? 'reactivar' : 'suspender (por falta de pago u otro motivo)';
