@@ -1451,6 +1451,81 @@
     }
   });
 
+  function rgbAHsl(r, g, b){
+    r/=255; g/=255; b/=255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b);
+    let h, s, l = (max+min)/2;
+    if(max === min){ h = s = 0; }
+    else{
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch(max){
+        case r: h = (g-b)/d + (g<b?6:0); break;
+        case g: h = (b-r)/d + 2; break;
+        default: h = (r-g)/d + 4;
+      }
+      h /= 6;
+    }
+    return [h*360, s*100, l*100];
+  }
+
+  function hslAHex(h, s, l){
+    s/=100; l/=100;
+    const k = n => (n + h/30) % 12;
+    const a = s * Math.min(l, 1-l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n)-3, Math.min(9-k(n), 1)));
+    const aRgb = v => Math.round(255*f(v)).toString(16).padStart(2,'0');
+    return `#${aRgb(0)}${aRgb(8)}${aRgb(4)}`;
+  }
+
+  function extraerColorDominante(imgElement){
+    const canvas = document.createElement('canvas');
+    const lado = 60;
+    canvas.width = lado; canvas.height = lado;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imgElement, 0, 0, lado, lado);
+    let datos;
+    try{
+      datos = ctx.getImageData(0, 0, lado, lado).data;
+    }catch(e){ return null; }
+
+    const cubos = {};
+    for(let i = 0; i < datos.length; i += 4){
+      const r = datos[i], g = datos[i+1], b = datos[i+2], alfa = datos[i+3];
+      if(alfa < 100) continue;
+      const [h, s, l] = rgbAHsl(r, g, b);
+      if(l < 12 || l > 88 || s < 15) continue; // ignora blancos, negros y grises
+      const clave = Math.round(h/15)*15; // agrupa por tono cada 15°
+      cubos[clave] = cubos[clave] || { cuenta: 0, sSum: 0, lSum: 0 };
+      cubos[clave].cuenta++;
+      cubos[clave].sSum += s;
+      cubos[clave].lSum += l;
+    }
+    const tonos = Object.entries(cubos).sort((a,b) => b[1].cuenta - a[1].cuenta);
+    if(tonos.length === 0) return null;
+    const [tonoGanador, info] = tonos[0];
+    return { h: Number(tonoGanador), s: info.sSum/info.cuenta, l: info.lSum/info.cuenta };
+  }
+
+  function generarPaletaDesdeColor(hsl){
+    if(!hsl) return null;
+    const { h } = hsl;
+    const s = Math.min(Math.max(hsl.s, 35), 65);
+    return {
+      verdeOscuro: hslAHex(h, s, 22),
+      verdeMedio: hslAHex(h, s, 34),
+      tierra: hslAHex((h + 35) % 360, Math.min(s + 10, 70), 42),
+    };
+  }
+
+  function aplicarPaleta(paleta){
+    if(!paleta) return;
+    const raiz = document.documentElement.style;
+    if(paleta.verdeOscuro) raiz.setProperty('--verde-oscuro', paleta.verdeOscuro);
+    if(paleta.verdeMedio) raiz.setProperty('--verde-medio', paleta.verdeMedio);
+    if(paleta.tierra) raiz.setProperty('--tierra', paleta.tierra);
+  }
+
   function comprimirImagenABase64(archivo, maxLado, calidad){
     return new Promise((resolve, reject) => {
       const lector = new FileReader();
@@ -1491,10 +1566,29 @@
         alert('La imagen sigue siendo muy pesada incluso comprimida. Intenta con una más simple (ideal: un logo con pocos colores).');
         return;
       }
-      await refOrg().update({ logoBase64: base64 });
+
+      const datosActualizar = { logoBase64: base64 };
+      try{
+        const imgTemporal = new Image();
+        await new Promise((resolve, reject) => {
+          imgTemporal.onload = resolve;
+          imgTemporal.onerror = reject;
+          imgTemporal.src = base64;
+        });
+        const colorDominante = extraerColorDominante(imgTemporal);
+        const paleta = generarPaletaDesdeColor(colorDominante);
+        if(paleta){
+          datosActualizar.paletaColores = paleta;
+          aplicarPaleta(paleta);
+        }
+      }catch(err){
+        console.warn('No se pudo calcular la paleta de colores automáticamente:', err);
+      }
+
+      await refOrg().update(datosActualizar);
       document.getElementById('logo-organizacion').src = base64;
       document.getElementById('admin-logo-preview').src = base64;
-      alert('Logo actualizado correctamente.');
+      alert('Logo actualizado correctamente.' + (datosActualizar.paletaColores ? ' Los colores de la app se ajustaron según el logo.' : ''));
     }catch(err){
       alert('No se pudo procesar el logo: ' + err.message);
     }finally{
@@ -1759,6 +1853,9 @@
       }
       if(doc.data().logoBase64){
         document.getElementById('logo-organizacion').src = doc.data().logoBase64;
+      }
+      if(doc.data().paletaColores){
+        aplicarPaleta(doc.data().paletaColores);
       }
       return true;
     }catch(err){
