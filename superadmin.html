@@ -74,6 +74,9 @@
     </div>
     <div class="mensaje-error" id="su_error"></div>
     <button class="btn-primario" id="btn_su_entrar">Ingresar</button>
+    <div style="margin-top:12px;">
+      <a href="#" id="su_link_olvide_clave" style="font-size:0.85rem;color:var(--verde-medio);">¿Olvidaste tu contraseña?</a>
+    </div>
   </div>
 
   <div id="panel-super" style="display:none;">
@@ -170,6 +173,25 @@
       await auth.signInWithEmailAndPassword(email, password);
     }catch(err){
       errorEl.textContent = 'Correo o contraseña incorrectos.';
+      errorEl.style.display = 'block';
+    }
+  });
+
+  document.getElementById('su_link_olvide_clave').addEventListener('click', async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById('su_error');
+    errorEl.style.display = 'none';
+    const email = document.getElementById('su_email').value.trim();
+    if(!email){
+      errorEl.textContent = 'Escribe tu correo arriba primero, y luego toca "¿Olvidaste tu contraseña?" de nuevo.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    try{
+      await auth.sendPasswordResetEmail(email);
+      alert('Listo. Revisa tu correo (' + email + ') — te enviamos un link para crear una nueva contraseña.');
+    }catch(err){
+      errorEl.textContent = 'No se pudo enviar el correo. Verifica que esté bien escrito.';
       errorEl.style.display = 'block';
     }
   });

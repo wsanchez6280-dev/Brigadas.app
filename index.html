@@ -591,6 +591,9 @@
       </div>
       <div class="mensaje-error" id="admin-error"></div>
       <button class="btn-secundario" id="btn-admin-entrar">Ingresar</button>
+      <div style="margin-top:12px;">
+        <a href="#" id="link-olvide-clave" style="font-size:0.85rem;color:var(--verde-medio);">¿Olvidaste tu contraseña?</a>
+      </div>
     </div>
 
     <div id="admin-panel" style="display:none;">
@@ -1416,6 +1419,26 @@
       cargarPanelAdmin();
     }catch(err){
       errorEl.textContent = 'Correo o contraseña incorrectos.';
+      errorEl.style.display = 'block';
+    }
+  });
+
+  document.getElementById('link-olvide-clave').addEventListener('click', async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById('admin-error');
+    errorEl.style.display = 'none';
+    const email = document.getElementById('admin_email').value.trim();
+    if(!email){
+      errorEl.textContent = 'Escribe tu correo arriba primero, y luego toca "¿Olvidaste tu contraseña?" de nuevo.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    try{
+      await auth.sendPasswordResetEmail(email);
+      errorEl.style.display = 'none';
+      alert('Listo. Revisa tu correo (' + email + ') — te enviamos un link para crear una nueva contraseña. Si no lo ves, revisa la carpeta de spam.');
+    }catch(err){
+      errorEl.textContent = 'No se pudo enviar el correo. Verifica que el correo esté escrito correctamente.';
       errorEl.style.display = 'block';
     }
   });
